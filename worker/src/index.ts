@@ -4,7 +4,8 @@ import { handleMagicLink, handleVerifyMagicLink } from "./routes/auth";
 import { handleCreateHogar, handleGetHogar } from "./routes/hogar";
 import { handleGetInventory, handleInventoryAdd, handleInventoryRemove } from "./routes/inventory";
 import { handleGetEventsStock } from "./routes/events";
-import { API_ROUTES } from "../shared/constants";
+import { runSmokeTests } from "./tests/smoke.test";
+import { API_ROUTES } from "../../shared/constants";
 
 export interface Env {
   DB: D1Database;
@@ -33,6 +34,23 @@ export default {
 
     const queryGate = new D1QueryGate(env.DB);
 
+    // Endpoint público para pruebas de humo / verificación
+    if (path === "/api/v1/test") {
+      const success = await runSmokeTests();
+      return injectCors(
+        new Response(
+          JSON.stringify({
+            success,
+            message: success ? "Todas las pruebas pasaron con éxito" : "Pruebas fallidas",
+          }),
+          {
+            status: success ? 200 : 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+    }
+
     // Rutas Públicas de Autenticación
     if (path === API_ROUTES.AUTH_MAGIC_LINK) {
       const resp = await handleMagicLink(request, env, queryGate);
@@ -43,6 +61,7 @@ export default {
       const resp = await handleVerifyMagicLink(request, env, queryGate);
       return injectCors(resp);
     }
+
 
     // Validación de Token JWT para Rutas Protegidas
     const userSession = await authMiddleware(request, env);
