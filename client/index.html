@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Despensa — Bitera Digital</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mi Despensa">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Encabezado de la App -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 3L4 9v11a2 2 0 002 2h12a2 2 0 002-2V9L12 3zm0 2.2L18 10v9H6v-9l6-4.8zM9 12a1 1 0 100 2 1 1 0 000-2zm3 0a1 1 0 100 2 1 1 0 000-2zm3 0a1 1 0 100 2 1 1 0 000-2z"/>
+          </svg>
+        </div>
+        <span class="brand-text">Mi Despensa</span>
+      </div>
+      <div id="sync-status" class="sync-badge synced">Sincronizado</div>
+    </header>
+
+    <!-- Vista 1: Autenticación (Magic Link) -->
+    <main id="view-auth" class="view">
+      <h1 class="auth-title">Bienvenido</h1>
+      <p class="auth-desc">Accede al control de tu despensa familiar sin contraseñas.</p>
+      
+      <!-- Paso 1: Enviar Email -->
+      <div id="auth-step-email" class="glass-card">
+        <div class="form-group">
+          <label class="form-label" for="login-email">Correo Electrónico</label>
+          <input type="email" id="login-email" placeholder="ejemplo@biteradigital.com" required>
+        </div>
+        <button id="btn-request-link">Obtener Magic Link</button>
+      </div>
+
+      <!-- Paso 2: Verificar Token -->
+      <div id="auth-step-verify" class="glass-card hidden">
+        <div class="form-group">
+          <label class="form-label" for="verify-token">Ingresar Token de Acceso</label>
+          <input type="text" id="verify-token" placeholder="Pega el token recibido aquí...">
+        </div>
+        <button id="btn-submit-token">Iniciar Sesión</button>
+        <button id="btn-back-email" class="btn-secondary">Volver a ingresar email</button>
+      </div>
+    </main>
+
+    <!-- Vista 2: Creación de Hogar (Tenant Setup) -->
+    <main id="view-setup-hogar" class="view hidden">
+      <h1 class="auth-title">Configurar Hogar</h1>
+      <p class="auth-desc">Crea un espacio compartido para coordinar la despensa con tu familia.</p>
+      
+      <div class="glass-card">
+        <div class="form-group">
+          <label class="form-label" for="hogar-name">Nombre del Hogar / Alacena</label>
+          <input type="text" id="hogar-name" placeholder="Despensa Familia Pérez" required>
+        </div>
+        <button id="btn-create-hogar">Crear Hogar</button>
+      </div>
+    </main>
+
+    <!-- Vista 3: Dashboard Principal (Inventario & Stock) -->
+    <main id="view-dashboard" class="view hidden">
+      
+      <div class="welcome-section">
+        <h2 class="welcome-title" id="dashboard-hogar-name">Mi Despensa</h2>
+        <span class="welcome-subtitle" id="dashboard-user-identity">Identidad: Anonimizado</span>
+      </div>
+
+      <!-- Agregar nuevo producto -->
+      <div class="glass-card">
+        <h3 class="section-title" style="font-size: 15px;">Añadir Artículo</h3>
+        <div class="form-group" style="flex-direction: row; gap: 10px;">
+          <input type="text" id="new-product-name" placeholder="Leche, Arroz, Café..." style="flex: 1; padding: 10px 12px;">
+          <button id="btn-add-product" style="padding: 10px 16px; box-shadow: none;">+</button>
+        </div>
+      </div>
+
+      <!-- Listado de Stock -->
+      <div>
+        <h3 class="section-title" style="margin-bottom: 14px;">
+          <span>Inventario Actual</span>
+          <button id="btn-refresh-manual" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; box-shadow: none;">Refrescar</button>
+        </h3>
+        <div id="inventory-list-container" class="inventory-list">
+          <!-- Dinámico -->
+        </div>
+      </div>
+
+      <!-- Logs de Auditoría (D1 events_stock) -->
+      <div class="glass-card">
+        <h3 class="section-title" style="font-size: 14px; margin-bottom: 8px;">
+          <span>Historial de Eventos (events_stock)</span>
+          <span style="font-size: 10px; color: var(--text-muted);">Append-Only</span>
+        </h3>
+        <div id="event-log-list" class="event-log-container">
+          <!-- Dinámico -->
+        </div>
+      </div>
+
+      <!-- Acciones globales -->
+      <button id="btn-logout" class="btn-secondary" style="margin-top: 10px;">Cerrar Sesión</button>
+    </main>
+
+    <!-- Footer Corporativo -->
+    <footer class="footer-info">
+      Mi Despensa es un producto oficial de <a href="https://biteradigital.com" target="_blank">Bitera Digital</a>.<br>
+      © 2026. Todos los derechos reservados.
+    </footer>
+
+  </div>
+
+  <!-- Toast Notificaciones -->
+  <div id="toast" class="toast">Notificación</div>
+
+  <!-- Scripts de la PWA -->
+  <script src="indexeddb.js"></script>
+  <script src="sync.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
