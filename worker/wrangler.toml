@@ -1,0 +1,13 @@
+name = "web-api-midespensa"
+main = "src/index.ts"
+compatibility_date = "2024-05-02"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "midespensa-db"
+database_id = "local-db"
+
+[vars]
+JWT_SECRET = "dev-secret-jwt-key-minimum-256-bits-for-hs256-signature-key-should-be-long-enough-for-security"
+# Clave hexadecimal de 32 bytes para encriptar e-mail en desarrollo
+ENCRYPTION_KEY_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
