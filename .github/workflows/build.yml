@@ -1,0 +1,56 @@
+name: Build Check
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    name: Build and Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: worker
+
+      - name: Audit - CI Build Started
+        if: always()
+        run: node scripts/record-audit-log.js CI_BUILD_STARTED "{\"commit\":\"${{ github.sha }}\",\"actor\":\"${{ github.actor }}\",\"branch\":\"${{ github.ref_name }}\"}"
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+
+      - name: TypeScript Compile / Check
+        run: npx tsc
+        working-directory: worker
+
+      - name: Audit - CI Build Success
+        if: success()
+        run: node scripts/record-audit-log.js CI_BUILD_SUCCESS "{\"commit\":\"${{ github.sha }}\",\"status\":\"success\"}"
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+
+      - name: Audit - CI Build Failed
+        if: failure()
+        run: node scripts/record-audit-log.js CI_BUILD_FAILED "{\"commit\":\"${{ github.sha }}\",\"status\":\"failed\"}"
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}

@@ -1,0 +1,42 @@
+name: Test Suite Coverage
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    name: Run Unit and Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: worker
+
+      - name: Run Tests with Coverage
+        run: npm run test:coverage
+        working-directory: worker
+
+      - name: Audit - CI Test / Coverage Failed
+        if: failure()
+        run: node scripts/record-audit-log.js CI_BUILD_FAILED "{\"commit\":\"${{ github.sha }}\",\"reason\":\"tests_failed_or_coverage_under_85\"}"
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
