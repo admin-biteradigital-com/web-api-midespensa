@@ -1,5 +1,6 @@
 import { hashEmail, encryptEmail, decryptEmail } from "../utils/crypto";
 import { TenantContext, D1QueryGate } from "../middleware/tel";
+import { describe, it, expect } from "vitest";
 
 // Mock para simular D1 y validar el Query Gate
 class MockD1Database {
@@ -95,3 +96,10 @@ export async function runSmokeTests() {
     return true;
   }
 }
+
+describe("Smoke Tests", () => {
+  it("Debería pasar todas las pruebas de humo", async () => {
+    const success = await runSmokeTests();
+    expect(success).toBe(true);
+  });
+});
