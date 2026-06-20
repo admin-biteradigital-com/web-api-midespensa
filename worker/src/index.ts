@@ -6,11 +6,14 @@ import { handleGetInventory, handleInventoryAdd, handleInventoryRemove } from ".
 import { handleGetEventsStock } from "./routes/events";
 import { runSmokeTests } from "./tests/smoke.test";
 import { API_ROUTES } from "../../shared/constants";
+import { D1AuditEvidenceProvider } from "./utils/audit";
 
 export interface Env {
   DB: D1Database;
   JWT_SECRET: string;
   ENCRYPTION_KEY_HEX: string;
+  RESEND_API_KEY?: string;
+  ENVIRONMENT?: string;
 }
 
 const corsHeaders = {
@@ -33,6 +36,7 @@ export default {
     }
 
     const queryGate = new D1QueryGate(env.DB);
+    const auditProvider = new D1AuditEvidenceProvider(queryGate, env.JWT_SECRET);
 
     // Endpoint público para pruebas de humo / verificación
     if (path === "/api/v1/test") {
@@ -53,15 +57,14 @@ export default {
 
     // Rutas Públicas de Autenticación
     if (path === API_ROUTES.AUTH_MAGIC_LINK) {
-      const resp = await handleMagicLink(request, env, queryGate);
+      const resp = await handleMagicLink(request, env, queryGate, auditProvider);
       return injectCors(resp);
     }
     
     if (path === API_ROUTES.AUTH_VERIFY) {
-      const resp = await handleVerifyMagicLink(request, env, queryGate);
+      const resp = await handleVerifyMagicLink(request, env, queryGate, auditProvider);
       return injectCors(resp);
     }
-
 
     // Validación de Token JWT para Rutas Protegidas
     const userSession = await authMiddleware(request, env);
@@ -78,7 +81,7 @@ export default {
     try {
       if (path === API_ROUTES.HOGAR) {
         if (request.method === "POST") {
-          return injectCors(await handleCreateHogar(request, env, queryGate, userSession));
+          return injectCors(await handleCreateHogar(request, env, queryGate, userSession, auditProvider));
         } else if (request.method === "GET") {
           return injectCors(await handleGetHogar(request, queryGate, userSession));
         }
@@ -89,11 +92,11 @@ export default {
       }
 
       if (path === API_ROUTES.INVENTORY_ADD) {
-        return injectCors(await handleInventoryAdd(request, queryGate, userSession));
+        return injectCors(await handleInventoryAdd(request, queryGate, userSession, auditProvider));
       }
 
       if (path === API_ROUTES.INVENTORY_REMOVE) {
-        return injectCors(await handleInventoryRemove(request, queryGate, userSession));
+        return injectCors(await handleInventoryRemove(request, queryGate, userSession, auditProvider));
       }
 
       if (path === API_ROUTES.EVENTS) {
@@ -108,6 +111,19 @@ export default {
         })
       );
     } catch (err: any) {
+      if (err.message.includes("SECURE_GATE_VIOLATION")) {
+        try {
+          await auditProvider.recordEvent(
+            userSession.userId,
+            "TENANT_BREACH_ATTEMPT",
+            { error: err.message, url: request.url },
+            userSession.hogarId
+          );
+        } catch (auditErr) {
+          console.error("Failed to log breach attempt:", auditErr);
+        }
+      }
+
       return injectCors(
         new Response(JSON.stringify({ error: "Error interno", details: err.message }), {
           status: 500,

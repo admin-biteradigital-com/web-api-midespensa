@@ -1,5 +1,6 @@
 import { JWTPayload, DBInventario } from "../../../shared/types";
 import { D1QueryGate, TenantContext } from "../middleware/tel";
+import { AuditEvidenceProvider } from "../utils/audit";
 
 export async function handleGetInventory(
   request: Request,
@@ -43,7 +44,8 @@ export async function handleGetInventory(
 export async function handleInventoryAdd(
   request: Request,
   queryGate: D1QueryGate,
-  userSession: JWTPayload
+  userSession: JWTPayload,
+  auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -113,6 +115,16 @@ export async function handleInventoryAdd(
     // 3. Ejecutar de forma atómica en bloque/transacción
     await queryGate.batch([inventarioStmt, eventStmt]);
 
+    const finalQty = existing ? existing.quantity + quantity_delta : quantity_delta;
+
+    // Registrar evento STOCK_MUTATION_ADD en auditoria_legal
+    await auditProvider.recordEvent(
+      userSession.userId,
+      "STOCK_MUTATION_ADD",
+      { productId, product_name: nameNormalized, quantity_delta, total_quantity: finalQty },
+      hogarId
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -120,7 +132,7 @@ export async function handleInventoryAdd(
         product: {
           id: productId,
           product_name: nameNormalized,
-          quantity: existing ? existing.quantity + quantity_delta : quantity_delta,
+          quantity: finalQty,
           updated_at: timestamp,
         },
       }),
@@ -139,7 +151,8 @@ export async function handleInventoryAdd(
 export async function handleInventoryRemove(
   request: Request,
   queryGate: D1QueryGate,
-  userSession: JWTPayload
+  userSession: JWTPayload,
+  auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -228,6 +241,14 @@ export async function handleInventoryRemove(
 
     // 3. Ejecutar de forma atómica
     await queryGate.batch([inventarioStmt, eventStmt]);
+
+    // Registrar evento STOCK_MUTATION_REMOVE en auditoria_legal
+    await auditProvider.recordEvent(
+      userSession.userId,
+      "STOCK_MUTATION_REMOVE",
+      { productId, product_name: nameNormalized, quantity_delta, total_quantity: newQty },
+      hogarId
+    );
 
     return new Response(
       JSON.stringify({

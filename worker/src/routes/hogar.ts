@@ -1,13 +1,14 @@
-import { JWTPayload } from "../../../shared/types";
+import { JWTPayload, DBHogar } from "../../../shared/types";
 import { D1QueryGate, TenantContext } from "../middleware/tel";
 import { createToken } from "../middleware/auth";
-import { DBHogar } from "../../../shared/types";
+import { AuditEvidenceProvider } from "../utils/audit";
 
 export async function handleCreateHogar(
   request: Request,
   env: { JWT_SECRET: string },
   queryGate: D1QueryGate,
-  userSession: JWTPayload
+  userSession: JWTPayload,
+  auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -44,6 +45,14 @@ export async function handleCreateHogar(
     await queryGate.executeSystemQuery(
       "INSERT INTO hogares (id, name, owner_id) VALUES (?, ?, ?)",
       [hogarId, name.trim(), userSession.userId]
+    );
+
+    // Registrar evento HOGAR_CREATE
+    await auditProvider.recordEvent(
+      userSession.userId,
+      "HOGAR_CREATE",
+      { name: name.trim(), hogarId },
+      hogarId
     );
 
     // Regenerar el token de sesión JWT con el nuevo hogarId

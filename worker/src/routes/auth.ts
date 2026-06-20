@@ -4,11 +4,13 @@ import { D1QueryGate } from "../middleware/tel";
 import { createToken } from "../middleware/auth";
 import { DBUser, DBHogar } from "../../../shared/types";
 import { sendMagicLink } from "../utils/mail";
+import { AuditEvidenceProvider } from "../utils/audit";
 
 export async function handleMagicLink(
   request: Request,
   env: { JWT_SECRET: string; RESEND_API_KEY?: string; ENVIRONMENT?: string },
-  queryGate: D1QueryGate
+  queryGate: D1QueryGate,
+  auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -22,6 +24,15 @@ export async function handleMagicLink(
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    const emailHash = await hashEmail(email);
+
+    // Registrar evento de solicitud de Magic Link (PII Protegida)
+    await auditProvider.recordEvent(
+      "SYSTEM_CONTROL_PLANE",
+      "AUTH_MAGIC_LINK_REQUESTED",
+      { emailHash }
+    );
 
     // Generar un token temporal para el Magic Link (expira en 10 min)
     const secret = new TextEncoder().encode(env.JWT_SECRET);
@@ -76,7 +87,8 @@ export async function handleMagicLink(
 export async function handleVerifyMagicLink(
   request: Request,
   env: { JWT_SECRET: string; ENCRYPTION_KEY_HEX: string },
-  queryGate: D1QueryGate
+  queryGate: D1QueryGate,
+  auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
   // Acepta tanto POST con JSON como GET con query string para mayor flexibilidad de testing manual
   let token = "";
@@ -152,6 +164,14 @@ export async function handleVerifyMagicLink(
       env.JWT_SECRET
     );
 
+    // Registrar evento de verificación exitosa (AUTH_SUCCESS)
+    await auditProvider.recordEvent(
+      userId,
+      "AUTH_SUCCESS",
+      { email: emailHash, hogarId },
+      hogarId
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -167,6 +187,17 @@ export async function handleVerifyMagicLink(
       }
     );
   } catch (err: any) {
+    // Registrar evento de verificación fallida (AUTH_FAILED)
+    try {
+      await auditProvider.recordEvent(
+        "SYSTEM_CONTROL_PLANE",
+        "AUTH_FAILED",
+        { error: err.message, tokenSnippet: token.substring(0, 10) + "..." }
+      );
+    } catch (auditErr) {
+      console.error("Failed to log auth failure event:", auditErr);
+    }
+
     return new Response(
       JSON.stringify({ error: "Token inválido o expirado", details: err.message }),
       {
