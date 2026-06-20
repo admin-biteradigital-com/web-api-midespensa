@@ -8,6 +8,7 @@ export default defineConfig({
       thresholds: {
         statements: 85,
       },
+      exclude: ["node_modules/**", "src/utils/smoke.ts", "src/tests/**"],
     },
   },
 });

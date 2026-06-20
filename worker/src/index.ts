@@ -4,7 +4,7 @@ import { handleMagicLink, handleVerifyMagicLink } from "./routes/auth";
 import { handleCreateHogar, handleGetHogar } from "./routes/hogar";
 import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory } from "./routes/inventory";
 import { handleGetEventsStock, handleRecordAuditLog } from "./routes/events";
-import { runSmokeTests } from "./tests/smoke.test";
+import { runSmokeTests } from "./utils/smoke";
 import { API_ROUTES } from "../../shared/constants";
 import { D1AuditEvidenceProvider } from "./utils/audit";
 

@@ -5,7 +5,7 @@ compatibility_date = "2024-05-02"
 [[d1_databases]]
 binding = "DB"
 database_name = "midespensa-db"
-database_id = "local-db"
+database_id = "c7f3980d-b55b-499f-853c-0ce027438a70"
 
 [vars]
 JWT_SECRET = "dev-secret-jwt-key-minimum-256-bits-for-hs256-signature-key-should-be-long-enough-for-security"
