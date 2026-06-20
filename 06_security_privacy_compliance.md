@@ -1,5 +1,8 @@
 # Security, Privacy & Compliance - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene especificaciones de seguridad y criptografía parciales obsoletas (como la firma asimétrica de JWT RS256/ES256). La versión canónica y oficial de la arquitectura de seguridad, incluyendo el uso oficial de HS256 y la separación de Control/Data Plane, se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md).
+
 La seguridad y la privacidad no son parches agregados al final del desarrollo; se diseñan e implementan en los cimientos del código y la infraestructura (*Security by Design* y *Privacy by Design*).
 
 ---

@@ -1,5 +1,8 @@
 # Observability Framework - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene especificaciones de infraestructura obsoletas (como el uso obligatorio de Cloudflare Logpush en el MVP). El sistema de logs y auditoría técnica se rige por la abstracción **Audit Evidence Provider** utilizando la base de datos D1 (`D1 Audit Trail` en tabla `auditoria_legal`) y se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md).
+
 Especificación del diseño de telemetría, trazas distribuidas y alarmas para monitorear la salud técnica y operativa del Edge.
 
 ---

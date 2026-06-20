@@ -28,3 +28,15 @@ CREATE TABLE events_stock (
   timestamp TEXT NOT NULL,
   actor_user_id TEXT NOT NULL
 );
+
+CREATE TABLE auditoria_legal (
+  id TEXT PRIMARY KEY,
+  timestamp TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  hogar_id TEXT,
+  action TEXT NOT NULL,
+  details TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  signature TEXT NOT NULL
+);
+

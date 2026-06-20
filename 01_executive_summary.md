@@ -1,5 +1,8 @@
 # Executive Summary - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene especificaciones parciales obsoletas respecto al MVP (como Durable Objects y WebSockets). La versión canónica y oficial de la arquitectura se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md). La organización responsable es **Bitera Digital SAS**.
+
 ## 1. Visión General del Negocio
 **Mi Despensa** es una plataforma colaborativa digital diseñada para resolver un problema crítico en la gestión doméstica contemporánea: la ineficiencia, el desperdicio de alimentos y la falta de visibilidad del inventario de productos consumibles del hogar. Mediante una arquitectura orientada a la colaboración en tiempo real y el modelado predictivo, la solución proporciona una fuente única de verdad sobre las existencias, patrones de consumo y flujos financieros del hogar.
 

@@ -1,5 +1,8 @@
 # Non-Functional Governance - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y alineado con los límites oficiales del MVP. Las latencias de la API del Edge se rigen de acuerdo al modelo canónico oficial en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md) y [46_performance_validation_framework.md](file:///d:/Desarrollos/web-api-midespensa/46_performance_validation_framework.md).
+
 Límites técnicos y restricciones operativas obligatorias para la ejecución y despliegue del sistema.
 
 ---

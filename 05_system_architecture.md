@@ -1,5 +1,8 @@
 # System & Data Architecture - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene especificaciones parciales obsoletas respecto al MVP (como la sección 3 de esquema de base de datos en español, y los flujos con Durable Objects y KV). La versión canónica y oficial de la arquitectura y el esquema SQL real en inglés se detallan en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md) y [d1-schema.sql](file:///d:/Desarrollos/web-api-midespensa/schema/d1-schema.sql).
+
 ## 1. Arquitectura Conceptual (Cloudflare Edge Pattern)
 
 La plataforma utiliza una topología distribuida de baja latencia basada en el Edge. Los servidores de aplicación tradicionales y bases de datos centralizadas son reemplazados por microservicios serverless distribuidos geográficamente en los puntos de presencia de Cloudflare.

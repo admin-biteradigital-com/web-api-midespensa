@@ -1,12 +1,15 @@
 # 62_organizational_context_deployment.md — Contexto Organizacional y de Despliegue
 
-Este documento establece la capa formal de identidad corporativa, gobernanza organizacional e implicaciones de direccionamiento de red para la plataforma **Mi Despensa**, propiedad de **Bitera Digital**.
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y alineado con el contexto de la nueva organización. La versión canónica y oficial de la arquitectura se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md).
+
+Este documento establece la capa formal de identidad corporativa, gobernanza organizacional e implicaciones de direccionamiento de red para la plataforma **Mi Despensa**, propiedad de **Bitera Digital SAS**.
 
 ---
 
 ## 1. Identidad de la Organización y Clasificación
 
-*   **Organización Propietaria:** **Bitera Digital**
+*   **Organización Propietaria:** **Bitera Digital SAS**
 *   **Sitio Web Corporativo:** [biteradigital.com](https://biteradigital.com)
 *   **Dominio de Despliegue del Sistema:** [midespensa.biteradigital.com](https://midespensa.biteradigital.com)
 *   **Clasificación del Producto:** Producto corporativo en fase de implementación (pre-producción controlada).

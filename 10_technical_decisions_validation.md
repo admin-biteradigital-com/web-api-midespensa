@@ -1,5 +1,8 @@
 # Validación y Justificación Técnica de Decisiones Arquitectónicas
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene justificaciones y especificaciones de decisiones técnicas obsoletas respecto al MVP (como Durable Objects, Cloudflare KV, R2 y Queues). La versión canónica y oficial de la arquitectura y la gobernanza se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md).
+
 Para asegurar que las elecciones tecnológicas estén impulsadas estrictamente por el dominio de negocio, los casos de uso específicos y la restricción financiera del proyecto, se realiza el siguiente análisis técnico-comercial.
 
 ---

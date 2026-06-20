@@ -1,5 +1,8 @@
 # Non Functional Requirements (NFR) - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene especificaciones parciales obsoletas respecto al MVP (como latencias de WebSockets y Durable Objects). La versión canónica y oficial de la arquitectura se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md). Los objetivos de latencia y rendimiento oficial se alinean con [46_performance_validation_framework.md](file:///d:/Desarrollos/web-api-midespensa/46_performance_validation_framework.md).
+
 Para lograr un sistema robusto, con latencia ultra-baja y escalabilidad masiva con costo operativo cero, se definen los siguientes Requerimientos No Funcionales organizados por pilares de ingeniería de software.
 
 ---

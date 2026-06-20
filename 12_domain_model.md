@@ -1,5 +1,8 @@
 # Domain Model - Mi Despensa
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene especificaciones parciales obsoletas sobre agregados e historial. El modelo oficial del dominio e integración con `events_stock` como la única Source of Truth de inventario se definen en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md).
+
 Este documento detalla el modelo de dominio conceptual, identificando entidades, objetos de valor (*Value Objects*), agregados e invariantes que garantizan la integridad de las reglas del negocio de **Mi Despensa**.
 
 ---

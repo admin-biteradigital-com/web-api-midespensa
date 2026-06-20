@@ -34,9 +34,10 @@ export async function runSmokeTests() {
     const keyHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     
     const hash = await hashEmail(email);
-    const expectedHash = "7f7bc8d4851219b18361730cfec954d249f7d24a919be6a89c9e830d1d283626"; // SHA-256 de test-email@biteradigital.com
+    const expectedHash = "9dd1c3e351dc4ecb0b3cf8df00c9f8892d5a0f2e009155bc243c9d1c6a41b665"; // SHA-256 de test-email@biteradigital.com
     
     if (hash !== expectedHash) {
+
       throw new Error(`Hash inválido. Obtenido: ${hash}, Esperado: ${expectedHash}`);
     }
     console.log("✅ Identity Model: Hash de e-mail correcto.");

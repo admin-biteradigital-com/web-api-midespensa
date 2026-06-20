@@ -1,5 +1,8 @@
 # Domain-Driven Product Vision & Evolutionary Architecture
 
+> [!WARNING]
+> **ESTADO DE REFERENCIA:** Este documento ha sido auditado y contiene referencias a componentes evolutivos (como Cloudflare Queues y Workers AI) no presentes en el MVP para cumplir la meta de costo USD 0. La versión canónica y oficial de la arquitectura se detalla en [67_final_architecture_canonical_model.md](file:///d:/Desarrollos/web-api-midespensa/67_final_architecture_canonical_model.md).
+
 Este documento detalla la estrategia de negocio y la arquitectura orientada al dominio (**Domain-Driven Design**) para **Mi Despensa**, asegurando que el diseño de software soporte el crecimiento funcional a largo plazo (ecosistema de gestión inteligente del hogar) sin requerir rediseños disruptivos de infraestructura.
 
 ---
