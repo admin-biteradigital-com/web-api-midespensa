@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleMagicLink, handleVerifyMagicLink } from "../routes/auth";
 import { handleCreateHogar, handleGetHogar } from "../routes/hogar";
 import { handleInventoryAdd, handleInventoryRemove, handleGetInventory } from "../routes/inventory";
+import { handleRecordAuditLog, handleGetEventsStock } from "../routes/events";
 import { D1QueryGate, TenantContext } from "../middleware/tel";
 import { authMiddleware, createToken } from "../middleware/auth";
 import { JWTPayload } from "../../../shared/types";
+import { hashEmail } from "../utils/crypto";
 
 // Setup mocks
 const mockAuditProvider = {
@@ -326,6 +328,120 @@ describe("Route Handlers Integration & Middlewares", () => {
 
       const response = await handleInventoryRemove(request, mockQueryGate, sessionUser, mockAuditProvider);
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe("Audit Log Route", () => {
+    it("Debería retornar 405 Method Not Allowed si no es POST", async () => {
+      const request = new Request("https://example.com/api/v1/admin/audit-log", { method: "GET" });
+      const response = await handleRecordAuditLog(request, queryGate, {
+        userId: "admin-id",
+        email: await hashEmail("admin@biteradigital.com"),
+        hogarId: null,
+      } as any, mockAuditProvider);
+      expect(response.status).toBe(405);
+    });
+
+    it("Debería retornar 403 Forbidden si el usuario no es admin@biteradigital.com", async () => {
+      const request = new Request("https://example.com/api/v1/admin/audit-log", {
+        method: "POST",
+        body: JSON.stringify({ actorId: "CI", action: "CI_BUILD_STARTED", details: {} }),
+      });
+      const response = await handleRecordAuditLog(request, queryGate, {
+        userId: "user-id",
+        email: await hashEmail("user@biteradigital.com"),
+        hogarId: null,
+      } as any, mockAuditProvider);
+      expect(response.status).toBe(403);
+      const json = await response.json() as any;
+      expect(json.error).toContain("Prohibido");
+    });
+
+    it("Debería retornar 400 Bad Request si faltan campos requeridos en el cuerpo", async () => {
+      const request = new Request("https://example.com/api/v1/admin/audit-log", {
+        method: "POST",
+        body: JSON.stringify({ actorId: "CI" }), // Faltan action y details
+      });
+      const response = await handleRecordAuditLog(request, queryGate, {
+        userId: "admin-id",
+        email: await hashEmail("admin@biteradigital.com"),
+        hogarId: null,
+      } as any, mockAuditProvider);
+      expect(response.status).toBe(400);
+      const json = await response.json() as any;
+      expect(json.error).toContain("Campos requeridos faltantes");
+    });
+
+    it("Debería registrar el evento y retornar 201 si el usuario es admin y los datos son correctos", async () => {
+      const request = new Request("https://example.com/api/v1/admin/audit-log", {
+        method: "POST",
+        body: JSON.stringify({
+          actorId: "CI_SYSTEM",
+          action: "CI_BUILD_STARTED",
+          details: { commit: "abc1234" },
+          hogarId: "hogar-123",
+        }),
+      });
+      const response = await handleRecordAuditLog(request, queryGate, {
+        userId: "admin-id",
+        email: await hashEmail("admin@biteradigital.com"),
+        hogarId: null,
+      } as any, mockAuditProvider);
+      
+      expect(response.status).toBe(201);
+      const json = await response.json() as any;
+      expect(json.success).toBe(true);
+      expect(mockAuditProvider.recordEvent).toHaveBeenCalledWith(
+        "CI_SYSTEM",
+        "CI_BUILD_STARTED",
+        { commit: "abc1234" },
+        "hogar-123"
+      );
+    });
+  });
+
+  describe("Event Routes", () => {
+    it("Debería retornar 405 Method Not Allowed si no es GET", async () => {
+      const request = new Request("https://example.com/api/v1/events_stock", { method: "POST" });
+      const response = await handleGetEventsStock(request, queryGate, {
+        userId: "user-123",
+        email: "hashed-email",
+        hogarId: "hogar-123",
+      } as any);
+      expect(response.status).toBe(405);
+    });
+
+    it("Debería retornar 400 Bad Request si el usuario no tiene hogar asociado", async () => {
+      const request = new Request("https://example.com/api/v1/events_stock", { method: "GET" });
+      const response = await handleGetEventsStock(request, queryGate, {
+        userId: "user-123",
+        email: "hashed-email",
+        hogarId: null, // Sin hogar
+      } as any);
+      expect(response.status).toBe(400);
+      const json = await response.json() as any;
+      expect(json.error).toContain("is not associated with any household");
+    });
+
+    it("Debería retornar 200 y el listado de eventos del hogar si es correcto", async () => {
+      const request = new Request("https://example.com/api/v1/events_stock", { method: "GET" });
+      const mockQueryGate = {
+        executeTenantQuery: vi.fn().mockResolvedValue([
+          { id: "e-1", hogar_id: "hogar-123", product_id: "p-1", event_type: "STOCK_MUTATION_ADD", quantity_delta: 5 }
+        ]),
+      } as any;
+
+      const response = await handleGetEventsStock(request, mockQueryGate, {
+        userId: "user-123",
+        email: "hashed-email",
+        hogarId: "hogar-123",
+      } as any);
+
+      expect(response.status).toBe(200);
+      const json = await response.json() as any;
+      expect(json.success).toBe(true);
+      expect(json.events).toHaveLength(1);
+      expect(mockQueryGate.executeTenantQuery).toHaveBeenCalled();
     });
   });
 });
