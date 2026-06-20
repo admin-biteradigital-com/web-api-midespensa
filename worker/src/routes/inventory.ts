@@ -1,6 +1,7 @@
 import { JWTPayload, DBInventario } from "../../../shared/types";
 import { D1QueryGate, TenantContext } from "../middleware/tel";
 import { AuditEvidenceProvider } from "../utils/audit";
+import { hashEmail } from "../utils/crypto";
 
 export async function handleGetInventory(
   request: Request,
@@ -260,6 +261,90 @@ export async function handleInventoryRemove(
           quantity: newQty,
           updated_at: timestamp,
         },
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+export async function handleRebuildInventory(
+  request: Request,
+  queryGate: D1QueryGate,
+  userSession: JWTPayload
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  // Verificar que el usuario sea admin@biteradigital.com (Control Plane)
+  const adminHash = await hashEmail("admin@biteradigital.com");
+  if (userSession.email !== adminHash) {
+    return new Response(
+      JSON.stringify({ error: "Prohibido: Solo identidades del Control Plane pueden reconstruir la vista materializada." }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  try {
+    // 1. Obtener la correspondencia de productId -> product_name desde auditoria_legal
+    const auditLogs = await queryGate.executeSystemQuery<{ details: string }>(
+      "SELECT details FROM auditoria_legal WHERE action = 'STOCK_MUTATION_ADD'"
+    );
+
+    const nameMap = new Map<string, string>();
+    for (const log of auditLogs) {
+      try {
+        const details = JSON.parse(log.details);
+        if (details.productId && details.product_name) {
+          nameMap.set(details.productId, details.product_name);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Obtener sumatoria de events_stock agrupados por hogar_id y product_id
+    const events = await queryGate.executeSystemQuery<{
+      hogar_id: string;
+      product_id: string;
+      quantity: number;
+      updated_at: string;
+    }>(
+      `SELECT hogar_id, product_id, SUM(quantity_delta) as quantity, MAX(timestamp) as updated_at
+       FROM events_stock
+       GROUP BY hogar_id, product_id
+       HAVING SUM(quantity_delta) > 0`
+    );
+
+    // 3. Reconstruir la tabla inventario en una única transacción
+    const statements = [
+      queryGate.prepare("DELETE FROM inventario")
+    ];
+
+    for (const event of events) {
+      const name = nameMap.get(event.product_id) || "Producto Recuperado";
+      statements.push(
+        queryGate.prepare(
+          "INSERT INTO inventario (id, hogar_id, product_name, quantity, updated_at) VALUES (?, ?, ?, ?, ?)"
+        ).bind(event.product_id, event.hogar_id, name, event.quantity, event.updated_at)
+      );
+    }
+
+    await queryGate.batch(statements);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Vista materializada 'inventario' reconstruida con éxito a partir de los eventos.",
+        rebuiltCount: events.length,
       }),
       {
         headers: { "Content-Type": "application/json" },

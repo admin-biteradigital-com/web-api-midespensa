@@ -2,7 +2,7 @@ import { authMiddleware } from "./middleware/auth";
 import { D1QueryGate } from "./middleware/tel";
 import { handleMagicLink, handleVerifyMagicLink } from "./routes/auth";
 import { handleCreateHogar, handleGetHogar } from "./routes/hogar";
-import { handleGetInventory, handleInventoryAdd, handleInventoryRemove } from "./routes/inventory";
+import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory } from "./routes/inventory";
 import { handleGetEventsStock } from "./routes/events";
 import { runSmokeTests } from "./tests/smoke.test";
 import { API_ROUTES } from "../../shared/constants";
@@ -101,6 +101,10 @@ export default {
 
       if (path === API_ROUTES.EVENTS) {
         return injectCors(await handleGetEventsStock(request, queryGate, userSession));
+      }
+
+      if (path === "/api/v1/admin/rebuild-inventory") {
+        return injectCors(await handleRebuildInventory(request, queryGate, userSession));
       }
 
       // Ruta no encontrada
