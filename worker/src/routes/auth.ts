@@ -3,10 +3,11 @@ import { hashEmail, encryptEmail } from "../utils/crypto";
 import { D1QueryGate } from "../middleware/tel";
 import { createToken } from "../middleware/auth";
 import { DBUser, DBHogar } from "../../../shared/types";
+import { sendMagicLink } from "../utils/mail";
 
 export async function handleMagicLink(
   request: Request,
-  env: { JWT_SECRET: string },
+  env: { JWT_SECRET: string; RESEND_API_KEY?: string; ENVIRONMENT?: string },
   queryGate: D1QueryGate
 ): Promise<Response> {
   if (request.method !== "POST") {
@@ -29,23 +30,41 @@ export async function handleMagicLink(
       .setExpirationTime("10m")
       .sign(secret);
 
-    // En Sprint 0, devolvemos el token y el link de depuración directamente
     const origin = new URL(request.url).origin;
-    const debugUrl = `${origin}/api/v1/auth/verify?token=${tempToken}`;
+    const magicLinkUrl = `${origin}/api/v1/auth/verify?token=${tempToken}`;
 
-    console.log(`[MAGIC LINK] Email: ${email} | URL: ${debugUrl}`);
+    // Envío del email utilizando Resend
+    const emailResult = await sendMagicLink(email, magicLinkUrl, env);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        token: tempToken,
-        debugUrl: debugUrl,
-        message: "Magic Link generado con éxito. Revisa la consola o usa el debugUrl.",
-      }),
-      {
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    if (!emailResult.success) {
+      return new Response(
+        JSON.stringify({
+          error: "No se pudo enviar el correo de verificación.",
+          details: emailResult.error,
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const responseBody: Record<string, any> = {
+      success: true,
+      message: emailResult.delivered
+        ? "Magic Link enviado a tu casilla de correo."
+        : "Magic Link generado localmente (revisa logs del servidor).",
+    };
+
+    // Si es desarrollo local, se devuelve el debugUrl para agilizar testing y CI/CD
+    if (env.ENVIRONMENT === "local" || !emailResult.delivered) {
+      responseBody.token = tempToken;
+      responseBody.debugUrl = magicLinkUrl;
+    }
+
+    return new Response(JSON.stringify(responseBody), {
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
