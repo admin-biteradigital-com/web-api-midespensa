@@ -21,7 +21,8 @@ describe("D1AuditEvidenceProvider (Audit Trail)", () => {
     await provider.recordEvent("user-1", "AUTH_SUCCESS", { ip: "127.0.0.1" }, "hogar-12");
 
     expect(queryGate.executeSystemFirst).toHaveBeenCalledWith(
-      "SELECT hash FROM auditoria_legal ORDER BY timestamp DESC, id DESC LIMIT 1"
+      "SELECT hash FROM auditoria_legal ORDER BY timestamp DESC, id DESC LIMIT 1",
+      []
     );
 
     expect(queryGate.executeSystemQuery).toHaveBeenCalledWith(

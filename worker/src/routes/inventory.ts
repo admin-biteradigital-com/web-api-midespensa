@@ -298,7 +298,8 @@ export async function handleRebuildInventory(
   try {
     // 1. Obtener la correspondencia de productId -> product_name desde auditoria_legal
     const auditLogs = await queryGate.executeSystemQuery<{ details: string }>(
-      "SELECT details FROM auditoria_legal WHERE action = 'STOCK_MUTATION_ADD'"
+      "SELECT details FROM auditoria_legal WHERE action = 'STOCK_MUTATION_ADD'",
+      []
     );
 
     const nameMap = new Map<string, string>();
@@ -321,7 +322,8 @@ export async function handleRebuildInventory(
       `SELECT hogar_id, product_id, SUM(quantity_delta) as quantity, MAX(timestamp) as updated_at
        FROM events_stock
        GROUP BY hogar_id, product_id
-       HAVING SUM(quantity_delta) > 0`
+       HAVING SUM(quantity_delta) > 0`,
+      []
     );
 
     // 3. Reconstruir la tabla inventario en una única transacción

@@ -28,7 +28,8 @@ export class D1AuditEvidenceProvider implements AuditEvidenceProvider {
     // 1. Obtener el hash del último registro de auditoría legal
     // Si no hay ninguno, el hash anterior es una cadena vacía
     const lastLog = await this.queryGate.executeSystemFirst<{ hash: string }>(
-      "SELECT hash FROM auditoria_legal ORDER BY timestamp DESC, id DESC LIMIT 1"
+      "SELECT hash FROM auditoria_legal ORDER BY timestamp DESC, id DESC LIMIT 1",
+      []
     );
     const prevHash = lastLog ? lastLog.hash : "";
 
