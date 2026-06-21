@@ -2,6 +2,5 @@ node_modules/
 .wrangler/
 dist/
 .dev.vars
-package-lock.json
 coverage/
 worker/coverage/
