@@ -6,6 +6,3 @@ compatibility_date = "2024-05-02"
 binding = "DB"
 database_name = "midespensa-db"
 database_id = "c7f3980d-b55b-499f-853c-0ce027438a70"
-
-[vars]
-ENCRYPTION_KEY_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
