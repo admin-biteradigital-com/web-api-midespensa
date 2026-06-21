@@ -33,7 +33,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy Client to Cloudflare Pages (Production)
-        run: npx wrangler pages deploy client --project-name=midespensa-client --branch=main
+        run: |
+          npx wrangler pages project list --account-id=69880180c9b38ae06acef2a021729a72
+          npx wrangler pages deploy client --project-name=midespensa-client --branch=main --commit-dirty=true --account-id=69880180c9b38ae06acef2a021729a72
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
