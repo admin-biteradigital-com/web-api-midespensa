@@ -8,6 +8,4 @@ database_name = "midespensa-db"
 database_id = "c7f3980d-b55b-499f-853c-0ce027438a70"
 
 [vars]
-JWT_SECRET = "dev-secret-jwt-key-minimum-256-bits-for-hs256-signature-key-should-be-long-enough-for-security"
-# Clave hexadecimal de 32 bytes para encriptar e-mail en desarrollo
 ENCRYPTION_KEY_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
