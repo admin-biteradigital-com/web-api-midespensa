@@ -43,7 +43,7 @@ export async function sendMagicLink(
             </div>
             <p style="color: #999; font-size: 12px;">Este enlace es temporal y vencerá en 10 minutos. Si no solicitaste este correo, puedes ignorarlo con seguridad.</p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-            <p style="color: #999; font-size: 11px; text-align: center;">Bitera Digital SAS — Mi Despensa</p>
+            <p style="color: #999; font-size: 11px; text-align: center;">Bitera Digital — Mi Despensa</p>
           </div>
         `,
       }),

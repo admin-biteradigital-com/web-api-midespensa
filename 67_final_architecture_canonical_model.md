@@ -224,4 +224,30 @@ GitHub Repository ──► GitHub Actions ──► Validation Gates ──► 
 5.  **Manual Approval (Aprobación Manual):** Firma y validación humana obligatoria antes de desplegar en producción desde `main` por `admin@biteradigital.com`.
 6.  **Production (Entorno de Producción):** Despliegue final e inalterable en el Edge.
 
+---
 
+## 6. Gobernanza del Estado de Presentación y Sesión (FSM & Session Module)
+
+Para blindar la separación de responsabilidades y asegurar que la arquitectura evolucione de forma limpia sin acoplamientos entre la lógica de interfaz de usuario y la persistencia de datos, se establecen las siguientes directivas de diseño:
+
+### 6.1. Semántica del Origen de Transiciones
+> *The origin of a state transition is not part of the state semantics. Any behavior that depends on the origin of AUTH_SUCCESS MUST be determined by the domain event that preceded the transition, not by the UI state itself.*
+
+El estado `AUTH_SUCCESS` de la FSM de presentación es estrictamente visual y no contiene información histórica sobre cómo se alcanzó. Toda diferenciación sobre si un usuario acaba de autenticarse mediante credenciales (`UserAuthenticated`) o si su sesión fue recuperada de forma transparente (`SessionRestored`) es propiedad de los eventos del dominio y debe ser resuelta por sus receptores correspondientes (como el orquestador), nunca inspeccionando el estado visual de la FSM.
+
+### 6.2. Fuente de Verdad sobre la Validez de Sesión
+> *The FSM MUST NEVER be considered the source of truth for session validity. Session validity is owned exclusively by SessionModule. The FSM only reflects the current presentation state.*
+
+> *The ApplicationOrchestrator may cache session information for presentation purposes. This cache MUST NOT be considered the source of truth for session validity.*
+
+La FSM tiene como único propósito reflejar la interfaz visual en un momento dado. Ningún componente del sistema fuera de la capa de presentación debe leer el estado actual de la FSM (ej. `fsm.state === 'AUTH_SUCCESS'`) para deducir si una sesión es válida o para autorizar operaciones. El estado real y la validez de la sesión residen única y exclusivamente bajo la custodia del `SessionModule`. Cualquier variable local o caché en el orquestador (`token`, `user`) tiene como único fin evitar lecturas excesivas al almacenamiento físico para fines de renderizado visual; no representa la fuente de verdad de la validez de la sesión.
+
+### 6.3. Aislamiento y Limitación de Payloads FSM
+> *The payload associated with an FSM state transition belongs exclusively to the presentation layer and MUST NOT contain domain data whose interpretation triggers business logic or session state mutations.*
+
+El parámetro `data` que se transmite opcionalmente a través de `setAuthState` y en el evento `FSM_STATE_CHANGED` sirve únicamente para enviar datos necesarios para pintar o controlar elementos visuales (por ejemplo, el mensaje de error o la causa de fallo de un timeout, o el correo electrónico para feedback visual). Está estrictamente prohibido pasar en este payload información del dominio (como tokens de autenticación o datos del perfil del usuario) con el propósito de que sean leídos y procesados por capas como el `SessionModule` para escribir o modificar la sesión activa. La FSM puede transportar payload de UI, pero nunca payload hacia el dominio.
+
+### 6.4. Límite de Acceso al Almacenamiento de Sesión (SessionModule API Boundary)
+> *No module other than SessionModule may directly read or write the persistent session storage (e.g. localStorage).*
+
+Queda estrictamente prohibido que cualquier módulo del cliente fuera del `SessionModule` realice llamadas directas de lectura o escritura a la API de persistencia local (como `localStorage.setItem("token", ...)`). Toda interacción física con las credenciales almacenadas debe encapsularse a través de la interfaz pública provista por el `SessionModule` para asegurar la cohesión de los datos y evitar regresiones de acoplamiento.

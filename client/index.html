@@ -31,8 +31,21 @@
       <div id="sync-status" class="sync-badge synced">Sincronizado</div>
     </header>
 
+    <!-- Vista 0: Carga y Autenticación de Acceso (Bootstrap State) -->
+    <main id="view-loading" class="view">
+      <div class="glass-card" style="text-align: center; padding: 40px 20px;">
+        <div class="brand-icon" style="margin: 0 auto 20px auto; width: 48px; height: 48px;">
+          <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: #fff;">
+            <path d="M12 3L4 9v11a2 2 0 002 2h12a2 2 0 002-2V9L12 3zm0 2.2L18 10v9H6v-9l6-4.8zM9 12a1 1 0 100 2 1 1 0 000-2zm3 0a1 1 0 100 2 1 1 0 000-2zm3 0a1 1 0 100 2 1 1 0 000-2z"/>
+          </svg>
+        </div>
+        <h2 id="loading-title" style="font-size: 20px; font-weight: 600; margin-bottom: 8px;">Verificando tu acceso...</h2>
+        <p id="loading-desc" style="font-size: 13px; color: var(--text-secondary);">Por favor, espera un momento.</p>
+      </div>
+    </main>
+
     <!-- Vista 1: Autenticación (Magic Link) -->
-    <main id="view-auth" class="view">
+    <main id="view-auth" class="view hidden">
       <h1 class="auth-title">Bienvenido</h1>
       <p class="auth-desc">Accede al control de tu despensa familiar sin contraseñas.</p>
       
@@ -40,47 +53,73 @@
       <div id="auth-step-email" class="glass-card">
         <div class="form-group">
           <label class="form-label" for="login-email">Correo Electrónico</label>
-          <input type="email" id="login-email" placeholder="ejemplo@biteradigital.com" required>
+          <input type="email" id="login-email" placeholder="tu@correo.com" required>
         </div>
-        <button id="btn-request-link">Obtener Magic Link</button>
+        <button id="btn-request-link">Enviar enlace de acceso</button>
       </div>
-
-      <!-- Paso 2: Verificar Token -->
-      <div id="auth-step-verify" class="glass-card hidden">
-        <div class="form-group">
-          <label class="form-label" for="verify-token">Ingresar Token de Acceso</label>
-          <input type="text" id="verify-token" placeholder="Pega el token recibido aquí...">
-        </div>
-        <button id="btn-submit-token">Iniciar Sesión</button>
-        <button id="btn-back-email" class="btn-secondary">Volver a ingresar email</button>
+    </main>
+ 
+    <!-- Vista 1.5: Confirmación de Email Enviado -->
+    <main id="view-auth-sent" class="view hidden">
+      <div class="glass-card" style="text-align: center; margin-top: 40px;">
+        <div style="font-size: 40px; margin-bottom: 10px;">✉️</div>
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Enlace enviado</h3>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 15px;">
+          Te enviamos un enlace de acceso seguro a tu correo electrónico. Abre el mensaje e ingresa desde el botón correspondiente.
+        </p>
+        <button id="btn-resend-email" style="margin-bottom: 10px;">Reenviar correo</button>
+        <button id="btn-change-email" class="btn-secondary">Volver a ingresar correo</button>
       </div>
     </main>
 
-    <!-- Vista 2: Creación de Hogar (Tenant Setup) -->
+    <!-- Vista 1.6: Fallo de Autenticación -->
+    <main id="view-auth-fail" class="view hidden">
+      <div class="glass-card" style="text-align: center; margin-top: 40px;">
+        <div style="font-size: 40px; margin-bottom: 10px;">⚠️</div>
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--accent-red) || #ff4a4a;">No pudimos verificar tu acceso</h3>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 15px;">
+          El enlace de ingreso ya no es válido. Puede haber expirado o haber sido utilizado anteriormente.
+        </p>
+        <button id="btn-request-new-link">Volver a intentar</button>
+      </div>
+    </main>
+
+    <!-- Vista 1.7: Autenticación Exitosa (Transitional State) -->
+    <main id="view-auth-success" class="view hidden">
+      <div class="glass-card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 40px; margin-bottom: 10px;">✅</div>
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Acceso concedido</h3>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+          Redireccionando a tu despensa...
+        </p>
+      </div>
+    </main>
+
+    <!-- Vista 2: Creación de Hogar (Configuración inicial) -->
     <main id="view-setup-hogar" class="view hidden">
       <h1 class="auth-title">Configurar Hogar</h1>
       <p class="auth-desc">Crea un espacio compartido para coordinar la despensa con tu familia.</p>
       
       <div class="glass-card">
         <div class="form-group">
-          <label class="form-label" for="hogar-name">Nombre del Hogar / Alacena</label>
-          <input type="text" id="hogar-name" placeholder="Despensa Familia Pérez" required>
+          <label class="form-label" for="hogar-name">Nombre de tu hogar (ej. Casa Pérez o Nuestro Depto)</label>
+          <input type="text" id="hogar-name" placeholder="Casa López" required>
         </div>
         <button id="btn-create-hogar">Crear Hogar</button>
       </div>
     </main>
 
-    <!-- Vista 3: Dashboard Principal (Inventario & Stock) -->
+    <!-- Vista 3: Dashboard Principal (Inventario y Stock) -->
     <main id="view-dashboard" class="view hidden">
       
       <div class="welcome-section">
         <h2 class="welcome-title" id="dashboard-hogar-name">Mi Despensa</h2>
-        <span class="welcome-subtitle" id="dashboard-user-identity">Identidad: Anonimizado</span>
+        <span class="welcome-subtitle" id="dashboard-user-identity">Usuario: Anonimizado</span>
       </div>
 
       <!-- Agregar nuevo producto -->
       <div class="glass-card">
-        <h3 class="section-title" style="font-size: 15px;">Añadir Artículo</h3>
+        <h3 class="section-title" style="font-size: 15px;">Añadir Producto</h3>
         <div class="form-group" style="flex-direction: row; gap: 10px;">
           <input type="text" id="new-product-name" placeholder="Leche, Arroz, Café..." style="flex: 1; padding: 10px 12px;">
           <button id="btn-add-product" style="padding: 10px 16px; box-shadow: none;">+</button>
@@ -91,18 +130,17 @@
       <div>
         <h3 class="section-title" style="margin-bottom: 14px;">
           <span>Inventario Actual</span>
-          <button id="btn-refresh-manual" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; box-shadow: none;">Refrescar</button>
+          <button id="btn-refresh-manual" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; box-shadow: none;">Actualizar</button>
         </h3>
         <div id="inventory-list-container" class="inventory-list">
           <!-- Dinámico -->
         </div>
       </div>
 
-      <!-- Logs de Auditoría (D1 events_stock) -->
+      <!-- Historial de cambios -->
       <div class="glass-card">
         <h3 class="section-title" style="font-size: 14px; margin-bottom: 8px;">
-          <span>Historial de Eventos (events_stock)</span>
-          <span style="font-size: 10px; color: var(--text-muted);">Append-Only</span>
+          <span>Actividad Reciente</span>
         </h3>
         <div id="event-log-list" class="event-log-container">
           <!-- Dinámico -->
@@ -127,6 +165,9 @@
   <!-- Scripts de la PWA -->
   <script src="indexeddb.js"></script>
   <script src="sync.js"></script>
+  <script src="core/event-bus.js"></script>
+  <script src="session/session-manager.js"></script>
+  <script src="auth-state.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

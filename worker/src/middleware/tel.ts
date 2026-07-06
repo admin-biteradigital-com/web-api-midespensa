@@ -67,6 +67,14 @@ export class D1QueryGate {
     return results[0] || null;
   }
 
+  public async executeSystemRun(
+    sql: string,
+    params: any[]
+  ): Promise<D1Result> {
+    const stmt = this.db.prepare(sql).bind(...params);
+    return await stmt.run();
+  }
+
   public prepare(sql: string): D1PreparedStatement {
     return this.db.prepare(sql);
   }

@@ -1,4 +1,9 @@
-// Registrar Service Worker para soporte offline
+// ============================================================================
+// Mi Despensa PWA — App Controller
+// Uses AUTH FSM from auth-state.js as single source of truth
+// ============================================================================
+
+// --- Service Worker Registration ---
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js")
@@ -7,197 +12,244 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// Estado Global de la Aplicación
-let token = localStorage.getItem("token") || "";
-let user = JSON.parse(localStorage.getItem("user") || "null");
+// --- Local Presentation Cache (Owned by ApplicationOrchestrator via Domain Events) ---
+// RULE: This cache is strictly for presentation/UI rendering purposes.
+// The sole source of truth for session validity is the SessionModule.
+let token = "";
+let user = null;
 
+// --- DOM References ---
 const ui = {
-  syncStatus: document.getElementById("sync-status"),
-  viewAuth: document.getElementById("view-auth"),
-  viewSetupHogar: document.getElementById("view-setup-hogar"),
-  viewDashboard: document.getElementById("view-dashboard"),
-  authStepEmail: document.getElementById("auth-step-email"),
-  authStepVerify: document.getElementById("auth-step-verify"),
-  inputEmail: document.getElementById("login-email"),
-  inputToken: document.getElementById("verify-token"),
-  inputHogarName: document.getElementById("hogar-name"),
-  inputProductName: document.getElementById("new-product-name"),
-  dashboardHogarName: document.getElementById("dashboard-hogar-name"),
-  dashboardUserIdentity: document.getElementById("dashboard-user-identity"),
-  inventoryContainer: document.getElementById("inventory-list-container"),
-  eventLogList: document.getElementById("event-log-list"),
-  toast: document.getElementById("toast"),
-  
-  // Botones
-  btnRequestLink: document.getElementById("btn-request-link"),
-  btnSubmitToken: document.getElementById("btn-submit-token"),
-  btnBackEmail: document.getElementById("btn-back-email"),
-  btnCreateHogar: document.getElementById("btn-create-hogar"),
-  btnCreateProduct: document.getElementById("btn-add-product"),
-  btnRefreshManual: document.getElementById("btn-refresh-manual"),
-  btnLogout: document.getElementById("btn-logout")
+  syncStatus:           document.getElementById("sync-status"),
+  viewLoading:          document.getElementById("view-loading"),
+  loadingTitle:         document.getElementById("loading-title"),
+  loadingDesc:          document.getElementById("loading-desc"),
+  viewAuth:             document.getElementById("view-auth"),
+  viewAuthSent:         document.getElementById("view-auth-sent"),
+  viewAuthFail:         document.getElementById("view-auth-fail"),
+  viewAuthSuccess:      document.getElementById("view-auth-success"),
+  viewSetupHogar:       document.getElementById("view-setup-hogar"),
+  viewDashboard:        document.getElementById("view-dashboard"),
+  inputEmail:           document.getElementById("login-email"),
+  inputHogarName:       document.getElementById("hogar-name"),
+  inputProductName:     document.getElementById("new-product-name"),
+  dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
+  dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
+  inventoryContainer:   document.getElementById("inventory-list-container"),
+  eventLogList:         document.getElementById("event-log-list"),
+  toast:                document.getElementById("toast"),
+  btnRequestLink:       document.getElementById("btn-request-link"),
+  btnResendEmail:       document.getElementById("btn-resend-email"),
+  btnChangeEmail:       document.getElementById("btn-change-email"),
+  btnRequestNewLink:    document.getElementById("btn-request-new-link"),
+  btnCreateHogar:       document.getElementById("btn-create-hogar"),
+  btnCreateProduct:     document.getElementById("btn-add-product"),
+  btnRefreshManual:     document.getElementById("btn-refresh-manual"),
+  btnLogout:            document.getElementById("btn-logout"),
 };
 
-// --- Gestión de Vistas ---
+// --- View Map (viewId string → DOM element) ---
+const VIEW_ELEMENTS = {
+  "view-loading":      ui.viewLoading,
+  "view-auth":         ui.viewAuth,
+  "view-auth-sent":    ui.viewAuthSent,
+  "view-auth-fail":    ui.viewAuthFail,
+  "view-auth-success": ui.viewAuthSuccess,
+  "view-setup-hogar":  ui.viewSetupHogar,
+  "view-dashboard":    ui.viewDashboard,
+};
+
+// --- View Controller ---
 function showView(viewId) {
-  ui.viewAuth.classList.add("hidden");
-  ui.viewSetupHogar.classList.add("hidden");
-  ui.viewDashboard.classList.add("hidden");
+  // Hide all views
+  for (const el of Object.values(VIEW_ELEMENTS)) {
+    if (el) el.classList.add("hidden");
+  }
   
-  if (viewId === "auth") {
-    ui.viewAuth.classList.remove("hidden");
-  } else if (viewId === "setup") {
-    ui.viewSetupHogar.classList.remove("hidden");
-  } else if (viewId === "dashboard") {
-    ui.viewDashboard.classList.remove("hidden");
+  // Resolve dashboard view dynamically to setup-hogar if no hogarId exists
+  let targetViewId = viewId;
+  if (viewId === "view-dashboard" && (!user || !user.hogarId)) {
+    targetViewId = "view-setup-hogar";
+  }
+
+  // Show target
+  const target = VIEW_ELEMENTS[targetViewId];
+  if (target) {
+    target.classList.remove("hidden");
+  } else {
+    console.error(`[VIEW] Unknown viewId: ${targetViewId}`);
+  }
+
+  // Dashboard side-effect
+  if (targetViewId === "view-dashboard") {
     loadDashboard();
   }
 }
 
-function updateSyncBadge(status) {
-  ui.syncStatus.className = "sync-badge";
-  ui.syncStatus.textContent = status;
-  
-  if (status === "Sincronizado") {
-    ui.syncStatus.classList.add("synced");
-  } else if (status === "Sincronizando...") {
-    ui.syncStatus.classList.add("syncing");
-  } else {
-    ui.syncStatus.classList.add("offline");
-  }
+function setLoadingMessage(title, desc) {
+  if (ui.loadingTitle) ui.loadingTitle.textContent = title;
+  if (ui.loadingDesc)  ui.loadingDesc.textContent  = desc;
 }
 
+// --- FSM Context (passed to setAuthState) ---
+const fsmContext = {
+  showView,
+  setLoadingMessage,
+  onTimeout: () => {
+    showToast("La verificación tardó demasiado. Intenta nuevamente.");
+    setAuthState(AUTH_STATES.AUTH_FAIL, fsmContext);
+  },
+};
+
+// --- Toast ---
 function showToast(message) {
   ui.toast.textContent = message;
   ui.toast.classList.add("show");
-  setTimeout(() => {
-    ui.toast.classList.remove("show");
-  }, 3000);
+  setTimeout(() => { ui.toast.classList.remove("show"); }, 3000);
 }
 
-// --- Flujo de Autenticación ---
+// --- Sync Badge ---
+function updateSyncBadge(status) {
+  ui.syncStatus.className = "sync-badge";
+  ui.syncStatus.textContent = status;
+  if (status === "Sincronizado")      ui.syncStatus.classList.add("synced");
+  else if (status === "Sincronizando...") ui.syncStatus.classList.add("syncing");
+  else                                    ui.syncStatus.classList.add("offline");
+}
 
-// 1. Solicitar Magic Link
-ui.btnRequestLink.addEventListener("click", async () => {
-  const email = ui.inputEmail.value.trim();
+// ============================================================================
+// AUTH FLOW — Email-First Magic Link
+// ============================================================================
+
+// --- Request Magic Link ---
+async function requestMagicLink(email) {
   if (!email) {
-    showToast("Por favor ingresa un correo");
+    showToast("Por favor ingresa un correo electrónico");
     return;
   }
-  
+
   ui.btnRequestLink.disabled = true;
   ui.btnRequestLink.textContent = "Solicitando...";
-  
+  ui.btnResendEmail.disabled = true;
+  ui.btnResendEmail.textContent = "Enviando...";
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const res = await fetch(`${API_BASE}/api/v1/auth/magic-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email }),
+      signal: controller.signal,
     });
-    
+    clearTimeout(timeoutId);
+
     const data = await res.json();
     if (res.ok && data.success) {
-      showToast("Magic Link simulado con éxito!");
-      console.log(`[DEV ONLY] Token de Login:`, data.token);
-      console.log(`[DEV ONLY] Link de Login:`, data.debugUrl);
-      
-      // Auto rellenar el input del token para facilitar el testing
-      ui.inputToken.value = data.token;
-      
-      ui.authStepEmail.classList.add("hidden");
-      ui.authStepVerify.classList.remove("hidden");
+      showToast("¡Enlace de acceso enviado a tu correo!");
+      console.log("[DEV ONLY] Token de Login:", data.token);
+      console.log("[DEV ONLY] Link de Login:", data.debugUrl);
+      setAuthState(AUTH_STATES.EMAIL_SENT, fsmContext);
     } else {
-      showToast(data.error || "Fallo al solicitar Magic Link");
+      showToast(data.error || "No se pudo enviar el enlace. Por favor, verifica tu correo.");
     }
   } catch (err) {
-    showToast("Error de conexión");
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      showToast("El servidor tardó demasiado en responder. Intenta de nuevo.");
+    } else {
+      showToast("No hay conexión con el servidor. Verifica tu internet.");
+    }
     console.error(err);
   } finally {
     ui.btnRequestLink.disabled = false;
-    ui.btnRequestLink.textContent = "Obtener Magic Link";
+    ui.btnRequestLink.textContent = "Enviar enlace de acceso";
+    ui.btnResendEmail.disabled = false;
+    ui.btnResendEmail.textContent = "Reenviar correo";
   }
-});
+}
 
-// Volver al paso 1
-ui.btnBackEmail.addEventListener("click", () => {
-  ui.authStepVerify.classList.add("hidden");
-  ui.authStepEmail.classList.remove("hidden");
-});
+// --- Verify Token (Edge API) ---
+async function verifyToken(tokenInput) {
+  setAuthState(AUTH_STATES.AUTHENTICATING, fsmContext);
 
-// 2. Verificar Token e Iniciar Sesión
-ui.btnSubmitToken.addEventListener("click", async () => {
-  const tokenInput = ui.inputToken.value.trim();
-  if (!tokenInput) {
-    showToast("Ingresa el token");
-    return;
-  }
-  
-  ui.btnSubmitToken.disabled = true;
-  ui.btnSubmitToken.textContent = "Verificando...";
-  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const res = await fetch(`${API_BASE}/api/v1/auth/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: tokenInput })
+      body: JSON.stringify({ token: tokenInput }),
+      signal: controller.signal,
     });
-    
+    clearTimeout(timeoutId);
+
     const data = await res.json();
     if (res.ok && data.success) {
-      token = data.token;
-      user = data.user;
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      
-      showToast("Inicio de sesión exitoso");
-      
-      if (user.hogarId) {
-        showView("dashboard");
-      } else {
-        showView("setup");
-      }
+      // Delegate session initialization to SessionModule (Domain Layer)
+      SessionModule.initSession(data.token, data.user);
+      showToast("¡Ingreso exitoso!");
+      return true;
     } else {
-      showToast(data.error || "Token inválido");
+      setAuthState(AUTH_STATES.AUTH_FAIL, fsmContext);
+      return false;
     }
   } catch (err) {
-    showToast("Error de conexión al verificar");
+    clearTimeout(timeoutId);
     console.error(err);
-  } finally {
-    ui.btnSubmitToken.disabled = false;
-    ui.btnSubmitToken.textContent = "Iniciar Sesión";
+    if (err.name === "AbortError") {
+      showToast("La verificación de acceso tardó demasiado tiempo.");
+    } else {
+      showToast("Error de conexión al verificar el enlace.");
+    }
+    setAuthState(AUTH_STATES.AUTH_FAIL, fsmContext);
+    return false;
   }
+}
+
+// --- Event Listeners ---
+ui.btnRequestLink.addEventListener("click", () => {
+  requestMagicLink(ui.inputEmail.value.trim());
 });
 
-// --- Flujo de Configuración de Hogar ---
+ui.btnResendEmail.addEventListener("click", () => {
+  requestMagicLink(ui.inputEmail.value.trim());
+});
+
+ui.btnChangeEmail.addEventListener("click", () => {
+  setAuthState(AUTH_STATES.EMAIL_ENTRY, fsmContext);
+});
+
+ui.btnRequestNewLink.addEventListener("click", () => {
+  setAuthState(AUTH_STATES.EMAIL_ENTRY, fsmContext);
+});
+
+// ============================================================================
+// HOGAR SETUP FLOW
+// ============================================================================
+
 ui.btnCreateHogar.addEventListener("click", async () => {
   const name = ui.inputHogarName.value.trim();
-  if (!name) {
-    showToast("Ingresa un nombre para tu hogar");
-    return;
-  }
-  
+  if (!name) { showToast("Ingresa un nombre para tu hogar"); return; }
+
   ui.btnCreateHogar.disabled = true;
   ui.btnCreateHogar.textContent = "Creando...";
-  
+
   try {
     const res = await fetch(`${API_BASE}/api/v1/hogar`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ name })
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({ name }),
     });
-    
+
     const data = await res.json();
     if (res.ok && data.success) {
-      token = data.token; // Guardar el nuevo token con el claim de hogarId
       user.hogarId = data.hogar.id;
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      
+      // Persist new session details via SessionModule
+      SessionModule.initSession(data.token, user);
       showToast("Hogar creado con éxito");
-      showView("dashboard");
     } else {
       showToast(data.error || "No se pudo crear el hogar");
     }
@@ -210,19 +262,20 @@ ui.btnCreateHogar.addEventListener("click", async () => {
   }
 });
 
-// --- Flujo del Dashboard ---
+// ============================================================================
+// DASHBOARD
+// ============================================================================
+
 async function loadDashboard() {
-  ui.dashboardUserIdentity.textContent = `Identidad (SHA-256): ${user.emailHash.substring(0, 15)}...`;
-  
-  // Renderizado inicial desde IndexedDB
+  ui.dashboardUserIdentity.textContent = `Usuario: ${user.emailHash.substring(0, 8)}`;
+
   const localInventory = await getInventoryLocal();
   renderInventoryList(localInventory);
-  
-  // Consultar nombre del hogar (solo si estamos online)
+
   if (navigator.onLine) {
     try {
       const res = await fetch(`${API_BASE}/api/v1/hogar`, {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { "Authorization": `Bearer ${token}` },
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -231,24 +284,21 @@ async function loadDashboard() {
     } catch (err) {
       console.warn("No se pudo obtener el nombre del hogar del servidor");
     }
-    
-    // Obtener logs de eventos
     loadEventLogs();
   } else {
     ui.dashboardHogarName.textContent = "Mi Despensa (Offline)";
     ui.eventLogList.innerHTML = `<div class="empty-state">Historial de eventos disponible solo en línea.</div>`;
   }
-  
-  // Ejecutar motor de sincronización de fondo
+
   triggerSync();
 }
 
 async function loadEventLogs() {
   if (!navigator.onLine) return;
-  
+
   try {
     const res = await fetch(`${API_BASE}/api/v1/events_stock`, {
-      headers: { "Authorization": `Bearer ${token}` }
+      headers: { "Authorization": `Bearer ${token}` },
     });
     const data = await res.json();
     if (res.ok && data.success) {
@@ -257,7 +307,6 @@ async function loadEventLogs() {
         ui.eventLogList.innerHTML = `<div class="empty-state">No hay eventos registrados en events_stock.</div>`;
         return;
       }
-      
       data.events.forEach(evt => {
         const row = document.createElement("div");
         row.className = `event-row ${evt.event_type.toLowerCase()}`;
@@ -273,9 +322,10 @@ async function loadEventLogs() {
   }
 }
 
+// Render dynamic stock cards
 function renderInventoryList(items) {
   ui.inventoryContainer.innerHTML = "";
-  
+
   if (items.length === 0) {
     ui.inventoryContainer.innerHTML = `
       <div class="empty-state">
@@ -285,55 +335,57 @@ function renderInventoryList(items) {
     `;
     return;
   }
-  
+
   items.forEach(item => {
     const card = document.createElement("div");
     card.className = "product-card";
-    
+
     const info = document.createElement("div");
     info.className = "product-info";
-    
+
     const name = document.createElement("span");
     name.className = "product-name";
     name.textContent = item.product_name;
-    
+
     const updated = document.createElement("span");
     updated.className = "product-updated";
     updated.textContent = `Actualizado: ${new Date(item.updated_at).toLocaleTimeString()}`;
-    
+
     info.appendChild(name);
     info.appendChild(updated);
-    
+
     const controls = document.createElement("div");
     controls.className = "quantity-controls";
-    
+
     const btnMin = document.createElement("button");
     btnMin.className = "qty-btn";
     btnMin.textContent = "-";
     btnMin.addEventListener("click", () => handleUpdateQuantity(item.product_name, "REMOVE", 1));
-    
+
     const qty = document.createElement("span");
     qty.className = "qty-number";
     qty.textContent = item.quantity;
-    
+
     const btnAdd = document.createElement("button");
     btnAdd.className = "qty-btn";
     btnAdd.textContent = "+";
     btnAdd.addEventListener("click", () => handleUpdateQuantity(item.product_name, "ADD", 1));
-    
+
     controls.appendChild(btnMin);
     controls.appendChild(qty);
     controls.appendChild(btnAdd);
-    
+
     card.appendChild(info);
     card.appendChild(controls);
     ui.inventoryContainer.appendChild(card);
   });
 }
 
-// --- Manejo de Acciones sobre el Stock ---
+// ============================================================================
+// STOCK MANAGEMENT
+// ============================================================================
+
 async function handleUpdateQuantity(productName, eventType, delta) {
-  // Comprobar invariante de stock no negativo localmente antes de encolar
   if (eventType === "REMOVE") {
     const currentList = await getInventoryLocal();
     const item = currentList.find(i => i.product_name === productName);
@@ -343,64 +395,149 @@ async function handleUpdateQuantity(productName, eventType, delta) {
     }
   }
 
-  // Guardar cambio en IndexedDB local e incremental
   await enqueueOfflineEvent(productName, eventType, delta);
-  
-  // Renderizar la UI de inmediato (Optimistic UI)
   const localInventory = await getInventoryLocal();
   renderInventoryList(localInventory);
-  
-  // Sincronizar de fondo si hay red
   triggerSync();
 }
 
-// Agregar artículo completo
 ui.btnCreateProduct.addEventListener("click", () => {
   const name = ui.inputProductName.value.trim();
-  if (!name) {
-    showToast("Ingresa el nombre del producto");
-    return;
-  }
-  
+  if (!name) { showToast("Ingresa el nombre del producto"); return; }
   handleUpdateQuantity(name, "ADD", 1);
   ui.inputProductName.value = "";
 });
 
-// --- Motor de Sincronización ---
+// ============================================================================
+// SYNC ENGINE
+// ============================================================================
+
 let isSyncing = false;
 async function triggerSync() {
   if (isSyncing) return;
   isSyncing = true;
-  
+
   const updatedList = await syncEngine(token, (status) => {
     updateSyncBadge(status);
   });
-  
+
   if (updatedList) {
     renderInventoryList(updatedList);
     loadEventLogs();
   }
-  
+
   isSyncing = false;
 }
 
-// Refresco manual
 ui.btnRefreshManual.addEventListener("click", () => {
   triggerSync();
   showToast("Actualizando datos...");
 });
 
-// Cerrar sesión
+// ============================================================================
+// APPLICATION ORCHESTRATOR
+// ============================================================================
+
+const ApplicationOrchestrator = (function () {
+  let _eventBus = null;
+  let _sessionModule = null;
+  let _fsmContext = null;
+
+  function setupListeners() {
+    if (!_eventBus) return;
+
+    // 1. Listen for new logins
+    _eventBus.on("UserAuthenticated", (event) => {
+      console.log("[Orchestrator] UserAuthenticated domain event received.");
+      token = event.data.token;
+      user = event.data.user;
+      if (getAuthState() !== AUTH_STATES.AUTH_SUCCESS) {
+        setAuthState(AUTH_STATES.AUTH_SUCCESS, _fsmContext);
+      }
+      routeToAppView();
+    });
+
+    // 2. Listen for rehydrated sessions
+    _eventBus.on("SessionRestored", (event) => {
+      console.log("[Orchestrator] SessionRestored domain event received.");
+      token = event.data.token;
+      user = event.data.user;
+      if (getAuthState() !== AUTH_STATES.AUTH_SUCCESS) {
+        setAuthState(AUTH_STATES.AUTH_SUCCESS, _fsmContext);
+      }
+      routeToAppView();
+    });
+
+    // 3. Listen for logouts
+    _eventBus.on("SessionCleared", () => {
+      console.log("[Orchestrator] SessionCleared domain event received.");
+      token = "";
+      user = null;
+      setAuthState(AUTH_STATES.EMAIL_ENTRY, _fsmContext);
+    });
+
+    // 4. Listen for session expiration triggers (e.g. from network layers)
+    _eventBus.on("SessionExpired", (event) => {
+      console.log("[Orchestrator] SessionExpired domain event received.");
+      token = "";
+      user = null;
+      showToast("Tu sesión ha expirado. Por favor ingresa nuevamente.");
+      setAuthState(AUTH_STATES.AUTH_FAIL, _fsmContext);
+    });
+  }
+
+  function routeToAppView() {
+    if (user && user.hogarId) {
+      showView("view-dashboard");
+    } else {
+      showView("view-setup-hogar");
+    }
+  }
+
+  return {
+    initialize(eventBus, sessionModule, fsmContext) {
+      _eventBus = eventBus;
+      _sessionModule = sessionModule;
+      _fsmContext = fsmContext;
+      setupListeners();
+      console.log("[Orchestrator] Initialized and listening to domain events.");
+    },
+
+    async boot() {
+      setAuthState(AUTH_STATES.BOOTSTRAP, _fsmContext);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get("token");
+
+      if (tokenFromUrl) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setAuthState(AUTH_STATES.LOADING_VERIFY, _fsmContext);
+        await verifyToken(tokenFromUrl);
+      } else {
+        setAuthState(AUTH_STATES.SESSION_REHYDRATING, _fsmContext);
+        const session = _sessionModule.rehydrateSession();
+        if (!session) {
+          setAuthState(AUTH_STATES.EMAIL_ENTRY, _fsmContext);
+        }
+      }
+    }
+  };
+})();
+
+// ============================================================================
+// LOGOUT
+// ============================================================================
+
 ui.btnLogout.addEventListener("click", () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-  token = "";
-  user = null;
   showToast("Sesión cerrada");
-  showView("auth");
+  // Clean up session via SessionModule. Events will handle state reset.
+  SessionModule.clearSession();
 });
 
-// Listeners de Red
+// ============================================================================
+// NETWORK LISTENERS
+// ============================================================================
+
 window.addEventListener("online", () => {
   showToast("Conexión restablecida. Sincronizando...");
   triggerSync();
@@ -411,19 +548,22 @@ window.addEventListener("offline", () => {
   updateSyncBadge("Offline (Sin Conexión)");
 });
 
-// --- Inicialización de la Aplicación ---
-function initApp() {
-  if (token && user) {
-    if (user.hogarId) {
-      showView("dashboard");
-    } else {
-      showView("setup");
-    }
-  } else {
-    showView("auth");
-  }
-  
-  // Verificar estado de red inicial
+// ============================================================================
+// APP INITIALIZATION
+// ============================================================================
+
+async function initApp() {
+  // 1. Inject FSM dependencies
+  setFSMEventBus(EventBus);
+
+  // 2. Initialize Session Module
+  SessionModule.initialize(EventBus, DOMAIN_EVENTS);
+
+  // 3. Initialize and Boot Application Orchestrator
+  ApplicationOrchestrator.initialize(EventBus, SessionModule, fsmContext);
+  await ApplicationOrchestrator.boot();
+
+  // Network state
   if (!navigator.onLine) {
     updateSyncBadge("Offline (Sin Conexión)");
   } else {
@@ -431,5 +571,5 @@ function initApp() {
   }
 }
 
-// Arrancar App
+// --- Launch ---
 initApp();

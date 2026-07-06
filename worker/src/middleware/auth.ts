@@ -6,8 +6,10 @@ export async function createToken(
   secretStr: string
 ): Promise<string> {
   const secret = new TextEncoder().encode(secretStr);
-  return await new SignJWT(payload as any)
+  return await new SignJWT({ ...payload, typ: "session" } as any)
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer("biteradigital:midespensa:auth")
+    .setAudience("biteradigital:midespensa:app")
     .setIssuedAt()
     .setExpirationTime("7d")
     .sign(secret);
@@ -24,7 +26,13 @@ export async function authMiddleware(
   const token = authHeader.substring(7);
   try {
     const secret = new TextEncoder().encode(env.JWT_SECRET);
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: "biteradigital:midespensa:auth",
+      audience: "biteradigital:midespensa:app",
+    });
+    if (payload.typ !== "session") {
+      return null;
+    }
     return payload as unknown as JWTPayload;
   } catch (err) {
     return null;

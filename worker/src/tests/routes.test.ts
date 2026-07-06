@@ -17,6 +17,7 @@ const mockDB = {
   prepare: vi.fn().mockReturnValue({
     bind: vi.fn().mockReturnValue({
       all: vi.fn().mockResolvedValue({ results: [] }),
+      run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
     }),
   }),
   batch: vi.fn().mockResolvedValue([]),
@@ -114,6 +115,7 @@ describe("Route Handlers Integration & Middlewares", () => {
       const mockQueryGate = {
         executeSystemFirst: vi.fn().mockResolvedValue(null),
         executeSystemQuery: vi.fn().mockResolvedValue([]),
+        executeSystemRun: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
       } as any;
 
       const verifyRequest = new Request("https://example.com/api/v1/auth/verify", {
@@ -148,6 +150,123 @@ describe("Route Handlers Integration & Middlewares", () => {
         "AUTH_FAILED",
         expect.any(Object)
       );
+    });
+
+    it("handleVerifyMagicLink GET debería retornar 307 redirect con security headers", async () => {
+      // Generar un token válido para usar en la URL
+      const linkRequest = new Request("https://example.com/api/v1/auth/magic-link", {
+        method: "POST",
+        body: JSON.stringify({ email: "redirect@biteradigital.com" }),
+      });
+      const linkResp = await handleMagicLink(linkRequest, env, queryGate, mockAuditProvider);
+      const { token: magicToken } = await linkResp.json() as { token: string };
+
+      const getRequest = new Request(
+        `https://example.com/api/v1/auth/verify?token=${magicToken}`,
+        { method: "GET" }
+      );
+
+      const response = await handleVerifyMagicLink(getRequest, env, queryGate, mockAuditProvider);
+      expect(response.status).toBe(307);
+
+      // Verificar Location header apunta al frontend con el token
+      const location = response.headers.get("Location");
+      expect(location).toBeDefined();
+      expect(location).toContain("/?token=");
+
+      // Verificar security headers
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+      expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    });
+
+    it("handleVerifyMagicLink GET debería retornar 400 si falta el token en la URL", async () => {
+      const getRequest = new Request(
+        "https://example.com/api/v1/auth/verify",
+        { method: "GET" }
+      );
+
+      const response = await handleVerifyMagicLink(getRequest, env, queryGate, mockAuditProvider);
+      expect(response.status).toBe(400);
+    });
+
+    it("handleVerifyMagicLink debería bloquear replay secuencial (segundo POST → 401)", async () => {
+      // Generar un magic link token
+      const linkRequest = new Request("https://example.com/api/v1/auth/magic-link", {
+        method: "POST",
+        body: JSON.stringify({ email: "replay@biteradigital.com" }),
+      });
+      const linkResp = await handleMagicLink(linkRequest, env, queryGate, mockAuditProvider);
+      const { token: replayToken } = await linkResp.json() as { token: string };
+
+      // Mock: primer intento consume el token (changes=1), segundo intento lo bloquea (changes=0)
+      let callCount = 0;
+      const replayQueryGate = {
+        executeSystemFirst: vi.fn().mockResolvedValue(null),
+        executeSystemQuery: vi.fn().mockResolvedValue([]),
+        executeSystemRun: vi.fn().mockImplementation(async () => {
+          callCount++;
+          return { meta: { changes: callCount === 1 ? 1 : 0 } };
+        }),
+      } as any;
+
+      // Primera verificación: debe tener éxito
+      const verify1 = new Request("https://example.com/api/v1/auth/verify", {
+        method: "POST",
+        body: JSON.stringify({ token: replayToken }),
+      });
+      const response1 = await handleVerifyMagicLink(verify1, env, replayQueryGate, mockAuditProvider);
+      expect(response1.status).toBe(200);
+
+      const json1 = await response1.json() as any;
+      expect(json1.success).toBe(true);
+
+      // Segunda verificación con el mismo token: debe fallar con 401 (replay blocked)
+      const verify2 = new Request("https://example.com/api/v1/auth/verify", {
+        method: "POST",
+        body: JSON.stringify({ token: replayToken }),
+      });
+      const response2 = await handleVerifyMagicLink(verify2, env, replayQueryGate, mockAuditProvider);
+      expect(response2.status).toBe(401);
+
+      const json2 = await response2.json() as any;
+      expect(json2.error).toContain("replay");
+    });
+
+    it("handleVerifyMagicLink debería bloquear replay concurrente (solo una solicitud exitosa)", async () => {
+      // Generar un magic link token
+      const linkRequest = new Request("https://example.com/api/v1/auth/magic-link", {
+        method: "POST",
+        body: JSON.stringify({ email: "concurrent@biteradigital.com" }),
+      });
+      const linkResp = await handleMagicLink(linkRequest, env, queryGate, mockAuditProvider);
+      const { token: concurrentToken } = await linkResp.json() as { token: string };
+
+      // Mock: simula la atomicidad de INSERT OR IGNORE — solo el primero obtiene changes=1
+      let insertCount = 0;
+      const concurrentQueryGate = {
+        executeSystemFirst: vi.fn().mockResolvedValue(null),
+        executeSystemQuery: vi.fn().mockResolvedValue([]),
+        executeSystemRun: vi.fn().mockImplementation(async () => {
+          insertCount++;
+          return { meta: { changes: insertCount === 1 ? 1 : 0 } };
+        }),
+      } as any;
+
+      // Ejecutar dos verificaciones simultáneas
+      const makeRequest = () => new Request("https://example.com/api/v1/auth/verify", {
+        method: "POST",
+        body: JSON.stringify({ token: concurrentToken }),
+      });
+
+      const [response1, response2] = await Promise.all([
+        handleVerifyMagicLink(makeRequest(), env, concurrentQueryGate, mockAuditProvider),
+        handleVerifyMagicLink(makeRequest(), env, concurrentQueryGate, mockAuditProvider),
+      ]);
+
+      const statuses = [response1.status, response2.status].sort();
+      // Exactamente una solicitud debe tener éxito (200) y la otra debe ser rechazada (401)
+      expect(statuses).toEqual([200, 401]);
     });
   });
 

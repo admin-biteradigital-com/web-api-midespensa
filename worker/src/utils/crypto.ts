@@ -1,7 +1,29 @@
-async function getCryptoKey(keyHex: string): Promise<CryptoKey> {
-  const rawKey = new Uint8Array(
-    keyHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-  );
+async function getCryptoKey(keyStr: string): Promise<CryptoKey> {
+  const cleanKey = keyStr.trim();
+  let rawKey: Uint8Array;
+
+  // Auto-detect format: Hex (32, 48, or 64 characters) vs Base64 (usually 44 characters)
+  const isHex = /^[0-9a-fA-F]+$/.test(cleanKey) && 
+                cleanKey.length % 2 === 0 && 
+                (cleanKey.length === 32 || cleanKey.length === 48 || cleanKey.length === 64);
+
+  if (isHex) {
+    rawKey = new Uint8Array(
+      cleanKey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+    );
+  } else {
+    // Treat as Base64 fallback (commonly used for 32-byte keys, resulting in 44 chars)
+    try {
+      const binaryString = atob(cleanKey);
+      rawKey = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        rawKey[i] = binaryString.charCodeAt(i);
+      }
+    } catch (e: any) {
+      throw new Error(`Failed to decode ENCRYPTION_KEY_HEX as Hex or Base64: ${e.message}`);
+    }
+  }
+
   return await crypto.subtle.importKey(
     "raw",
     rawKey,
@@ -59,4 +81,11 @@ export async function decryptEmail(encryptedStr: string, keyHex: string): Promis
   );
   
   return new TextDecoder().decode(decrypted);
+}
+
+export async function hashToken(token: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(token);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }

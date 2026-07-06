@@ -1,18 +1,21 @@
-const CACHE_NAME = "mi-despensa-cache-v1";
+const CACHE_NAME = "mi-despensa-cache-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./indexeddb.js",
-  "./sync.js"
+  "./sync.js",
+  "./core/event-bus.js",
+  "./session/session-manager.js",
+  "./auth-state.js"
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
-    })
+    }).then(() => self.skipWaiting())
   );
 });
 
@@ -26,7 +29,7 @@ self.addEventListener("activate", (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 

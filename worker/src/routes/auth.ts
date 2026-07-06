@@ -1,19 +1,28 @@
 import { SignJWT, jwtVerify } from "jose";
-import { hashEmail, encryptEmail } from "../utils/crypto";
+import { hashEmail, encryptEmail, hashToken } from "../utils/crypto";
 import { D1QueryGate } from "../middleware/tel";
 import { createToken } from "../middleware/auth";
 import { DBUser, DBHogar } from "../../../shared/types";
 import { sendMagicLink } from "../utils/mail";
 import { AuditEvidenceProvider } from "../utils/audit";
 
+const securityHeaders = {
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+};
+
 export async function handleMagicLink(
   request: Request,
-  env: { JWT_SECRET: string; RESEND_API_KEY?: string; ENVIRONMENT?: string },
+  env: { JWT_SECRET: string; RESEND_API_KEY?: string; ENVIRONMENT?: string; CLIENT_URL?: string },
   queryGate: D1QueryGate,
   auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
   if (request.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
+    return new Response("Method Not Allowed", { 
+      status: 405, 
+      headers: securityHeaders 
+    });
   }
 
   try {
@@ -21,7 +30,7 @@ export async function handleMagicLink(
     if (!email || !email.includes("@")) {
       return new Response(JSON.stringify({ error: "Invalid email" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...securityHeaders },
       });
     }
 
@@ -36,13 +45,19 @@ export async function handleMagicLink(
 
     // Generar un token temporal para el Magic Link (expira en 10 min)
     const secret = new TextEncoder().encode(env.JWT_SECRET);
-    const tempToken = await new SignJWT({ email })
+    const tempToken = await new SignJWT({ email, typ: "magic_link" })
       .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("biteradigital:midespensa:auth")
+      .setAudience("biteradigital:midespensa:app")
       .setExpirationTime("10m")
       .sign(secret);
 
-    const origin = new URL(request.url).origin;
-    const magicLinkUrl = `${origin}/api/v1/auth/verify?token=${tempToken}`;
+    // Enforce CLIENT_URL in production, fallback to request origin in local dev
+    let clientUrl = env.CLIENT_URL || "https://midespensa.biteradigital.com";
+    if (env.ENVIRONMENT === "local") {
+      clientUrl = env.CLIENT_URL || new URL(request.url).origin;
+    }
+    const magicLinkUrl = `${clientUrl}/api/v1/auth/verify?token=${tempToken}`;
 
     // Envío del email utilizando Resend
     const emailResult = await sendMagicLink(email, magicLinkUrl, env);
@@ -55,7 +70,7 @@ export async function handleMagicLink(
         }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...securityHeaders },
         }
       );
     }
@@ -74,53 +89,121 @@ export async function handleMagicLink(
     }
 
     return new Response(JSON.stringify(responseBody), {
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...securityHeaders },
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...securityHeaders },
     });
   }
 }
 
 export async function handleVerifyMagicLink(
   request: Request,
-  env: { JWT_SECRET: string; ENCRYPTION_KEY_HEX: string },
+  env: { JWT_SECRET: string; ENCRYPTION_KEY_HEX: string; CLIENT_URL?: string; ENVIRONMENT?: string },
   queryGate: D1QueryGate,
   auditProvider: AuditEvidenceProvider
 ): Promise<Response> {
-  // Acepta tanto POST con JSON como GET con query string para mayor flexibilidad de testing manual
-  let token = "";
-  if (request.method === "POST") {
-    try {
-      const body = (await request.json()) as { token: string };
-      token = body.token;
-    } catch (_) {}
-  } else if (request.method === "GET") {
+  // GET handler redirects (307)
+  if (request.method === "GET") {
     const url = new URL(request.url);
-    token = url.searchParams.get("token") || "";
-  } else {
-    return new Response("Method Not Allowed", { status: 405 });
+    const token = url.searchParams.get("token") || "";
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Missing token" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...securityHeaders },
+      });
+    }
+
+    let clientUrl = env.CLIENT_URL || "https://midespensa.biteradigital.com";
+    if (env.ENVIRONMENT === "local") {
+      clientUrl = env.CLIENT_URL || new URL(request.url).origin;
+    }
+
+    const redirectUrl = `${clientUrl}/?token=${encodeURIComponent(token)}`;
+    return new Response(null, {
+      status: 307,
+      headers: {
+        "Location": redirectUrl,
+        ...securityHeaders,
+      },
+    });
   }
+
+  // POST handler verifies and consumes token
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { 
+      status: 405,
+      headers: securityHeaders
+    });
+  }
+
+  let token = "";
+  try {
+    const body = (await request.json()) as { token: string };
+    token = body.token;
+  } catch (_) {}
 
   if (!token) {
     return new Response(JSON.stringify({ error: "Missing token" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...securityHeaders },
     });
   }
 
   try {
     const secret = new TextEncoder().encode(env.JWT_SECRET);
-    const { payload } = await jwtVerify(token, secret);
-    const email = payload.email as string;
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: "biteradigital:midespensa:auth",
+      audience: "biteradigital:midespensa:app",
+    });
 
+    if (payload.typ !== "magic_link") {
+      return new Response(JSON.stringify({ error: "Invalid token type" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...securityHeaders },
+      });
+    }
+
+    const email = payload.email as string;
     if (!email) {
       return new Response(JSON.stringify({ error: "Invalid token payload" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...securityHeaders },
       });
+    }
+
+    // SHA-256 Hashing of the token for atomic locking
+    const tokenHash = await hashToken(token);
+    const consumedAt = new Date().toISOString();
+
+    // OTT Atomic Lock: INSERT OR IGNORE and check changes
+    const runResult = await queryGate.executeSystemRun(
+      "INSERT OR IGNORE INTO consumed_tokens (token_hash, consumed_at) VALUES (?, ?)",
+      [tokenHash, consumedAt]
+    );
+
+    const changes = runResult.meta?.changes ?? 0;
+    if (changes === 0) {
+      // Replay attack blocked!
+      try {
+        await auditProvider.recordEvent(
+          "SYSTEM_CONTROL_PLANE",
+          "AUTH_FAILED",
+          { error: "Token already consumed (replay blocked)", tokenSnippet: token.substring(0, 10) + "..." }
+        );
+      } catch (auditErr) {
+        console.error("Failed to log auth failure event:", auditErr);
+      }
+
+      return new Response(
+        JSON.stringify({ error: "El token ya ha sido utilizado (replay blocked)" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...securityHeaders },
+        }
+      );
     }
 
     const emailHash = await hashEmail(email);
@@ -183,7 +266,7 @@ export async function handleVerifyMagicLink(
         },
       }),
       {
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...securityHeaders },
       }
     );
   } catch (err: any) {
@@ -202,7 +285,7 @@ export async function handleVerifyMagicLink(
       JSON.stringify({ error: "Token inválido o expirado", details: err.message }),
       {
         status: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...securityHeaders },
       }
     );
   }

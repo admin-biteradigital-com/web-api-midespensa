@@ -12,8 +12,16 @@ Plataforma colaborativa doméstica para la gestión del inventario y consumo fam
 
 ## Requisitos Previos
 
-* Node.js v18+ e npm.
+* Node.js v24 (versión especificada en `.nvmrc`) y NPM.
 * Cuenta de Cloudflare (opcional, para deploys).
+
+## Version Baseline
+Para garantizar un pipeline determinista y libre de drifts, se definen las siguientes versiones oficiales del proyecto:
+- **Node.js**: `24` (definido en `.nvmrc`)
+- **NPM**: `^10.0.0` o `^11.0.0` (incluido con Node 24)
+- **Wrangler**: `4.103.0` (definida en `worker/package.json`)
+- **TypeScript**: `^5.4.5`
+- **Cloudflare Compatibility Date**: `2024-05-02`
 
 ## Configuración y Desarrollo Local
 
