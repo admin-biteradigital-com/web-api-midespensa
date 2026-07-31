@@ -251,3 +251,77 @@ El parámetro `data` que se transmite opcionalmente a través de `setAuthState` 
 > *No module other than SessionModule may directly read or write the persistent session storage (e.g. localStorage).*
 
 Queda estrictamente prohibido que cualquier módulo del cliente fuera del `SessionModule` realice llamadas directas de lectura o escritura a la API de persistencia local (como `localStorage.setItem("token", ...)`). Toda interacción física con las credenciales almacenadas debe encapsularse a través de la interfaz pública provista por el `SessionModule` para asegurar la cohesión de los datos y evitar regresiones de acoplamiento.
+
+### 6.5. Inmutabilidad de Payloads del EventBus (Domain Event Immutability Rule)
+> *Every payload received from the EventBus SHALL be treated as an immutable value object. Consumers MUST NEVER mutate received payloads. Any required modification SHALL create a new object.*
+
+Para preservar el desacoplamiento y evitar efectos secundarios inesperados en la propagación de datos del dominio, todo payload transmitido a través del `EventBus` y recibido por los suscriptores es inmutable por definición. Está estrictamente prohibido que cualquier módulo suscriptor (como el `ApplicationOrchestrator`) intente modificar o añadir propiedades a estos objetos directamente. Si una funcionalidad requiere actualizar la información recibida (por ejemplo, asignar el identificador de hogar al usuario tras su creación), el consumidor deberá construir un nuevo objeto utilizando copias (ej. `{ ...user, hogarId: ... }`) o mediante transformaciones explícitas, dejando intacto el payload original.
+
+### 6.6. Fuente de Verdad Criptográfica y Jerarquía de Estado del Cliente (JWT Primacy Rule)
+> *The JWT issued by the backend is the cryptographically signed Source of Truth for session identity. The `localStorage.user` object is a local cache derived from the JWT. In any conflict between the two, the JWT prevails unconditionally.*
+
+**Decisión Arquitectónica:** El sistema reconoce formalmente dos representaciones del estado de sesión en el cliente:
+
+1.  **JWT (`localStorage.token`):** Firmado criptográficamente por el backend mediante HMAC-SHA256. Sus claims (`userId`, `email`, `hogarId`, `exp`, `iss`, `aud`, `typ`) constituyen datos verificables e inalterables por el cliente. Es la **fuente de verdad primaria**.
+2.  **Objeto de Usuario (`localStorage.user`):** Un JSON plano derivado del JWT al momento de la autenticación. Actúa como **caché de lectura rápida** para evitar decodificaciones repetidas del JWT en la capa de presentación. No posee ninguna garantía criptográfica y es susceptible de quedar desactualizado o corrompido por evoluciones del código del cliente.
+
+**Implicación:** Si el JWT contiene un claim con un valor diferente al del objeto `user` persistido, el valor del JWT es el correcto por definición. El `SessionModule` corregirá automáticamente el objeto de usuario al detectar la discrepancia durante la rehidratación.
+
+### 6.7. Motor de Reconciliación de Sesión (Session Reconciliation Engine)
+> *On every session rehydration, the SessionModule MUST validate the JWT semantics and reconcile any divergence between JWT claims and the persisted user object before dispatching SessionRestored.*
+
+El `SessionModule` implementa un motor de reconciliación declarativo que se ejecuta en cada arranque de la aplicación como parte del proceso de rehidratación. Su diseño sigue tres principios fundamentales:
+
+#### 6.7.1. Pipeline de Reconciliación
+La rehidratación ejecuta las siguientes fases secuenciales. Si cualquier fase falla, la sesión se destruye y el flujo se aborta:
+
+```
+Schema Version Check → JWT Decode → Semantic Validation → Declarative Reconciliation → Persist → Emit Events
+```
+
+1.  **Schema Version Check:** Verifica que la versión del esquema de almacenamiento (`schema_version`) coincida con la versión esperada por el código activo. Si hay discrepancia, se invalida toda la sesión.
+2.  **JWT Decode:** Extrae el payload del JWT de forma segura.
+3.  **Semantic Validation:** Verifica `exp` (expiración), `iss` (emisor), `aud` (audiencia) y `typ` (tipo de token). Si falla alguna, la sesión se destruye inmediatamente.
+    > [!WARNING]
+    > **Verificación Semántica vs. Validación Criptográfica:** El cliente realiza estas validaciones semánticas de forma offline. El cliente **no** valida la firma criptográfica (ya que no posee el secreto simétrico `JWT_SECRET`). La validación criptográfica de firmas ocurre estrictamente online en la API del Edge Worker. Modificar el payload del token localmente (por ejemplo, en tests o mediante la consola de desarrollo) servirá para evaluar la lógica de reconciliación y limpieza semántica local, pero dicho token será rechazado criptográficamente por la API ante cualquier petición de red posterior.
+4.  **Declarative Reconciliation:** Recorre un mapa declarativo (`SESSION_MAP`) que define las correspondencias entre claims del JWT y propiedades del objeto de usuario. Las discrepancias detectadas se recolectan, se aplican al objeto de usuario y se persisten en disco.
+5.  **Event Emission:** Si hubo reconciliación, se emite `SessionReconciled` con el detalle de las diferencias. Siempre se emite `SessionRestored` al final con el usuario (posiblemente corregido).
+
+#### 6.7.2. Mapa Declarativo de Correspondencias (Open/Closed Principle)
+El motor no conoce el dominio. Opera exclusivamente sobre un mapa estático de correspondencias:
+
+```javascript
+const SESSION_MAP = {
+  "userId":  "id",        // JWT claim → User property
+  "email":   "emailHash",
+  "hogarId": "hogarId"
+};
+```
+
+Para incorporar nuevos campos en el futuro (roles, permisos, tenantId, locale, featureFlags), basta con extender este mapa. El algoritmo de reconciliación no requiere modificaciones.
+
+#### 6.7.3. Evolución: Motor de Reconciliación Multi-Origen (V1+)
+El diseño actual reconcilia una única fuente criptográfica (JWT) contra una caché local (user). En versiones futuras del producto, cuando existan múltiples orígenes de verdad (endpoint de sesión `GET /api/v1/me`, servicio de feature flags, perfil de usuario, configuración de tenant), el motor podrá evolucionar hacia un pipeline genérico de reconciliación multi-origen:
+
+```
+Source A (JWT)         ─┐
+Source B (API /me)      ├─► Normalizer ─► Conflict Detector ─► Conflict Resolver ─► Persist ─► Emit
+Source C (Feature Flags)─┘
+```
+
+Esta evolución no requerirá reescribir el motor actual, sino extender las entradas del pipeline manteniendo la misma interfaz declarativa.
+
+#### 6.7.4. Evolución: Session Health (V1+)
+Para mejorar la observabilidad, se evaluará en sprints posteriores la incorporación de un modelo explícito de salud de la sesión con los siguientes estados internos:
+
+| Estado | Significado |
+| :--- | :--- |
+| `Healthy` | JWT válido, usuario consistente, esquema actual. |
+| `Reconciling` | Discrepancias detectadas, corrección en curso. |
+| `Invalid` | JWT semánticamente inválido (issuer, audience o tipo incorrectos). |
+| `Expired` | JWT expirado. |
+| `Corrupted` | Datos de almacenamiento irrecuperables (JSON malformado). |
+
+La infraestructura de eventos actual (`SessionRestored`, `SessionReconciled`, `SessionCleared`, `SessionExpired`) ya captura implícitamente estas transiciones de estado. La formalización en un modelo explícito de `SessionHealth` se realizará cuando existan requerimientos concretos de telemetría o monitoreo que lo justifiquen.
+
+

@@ -9,6 +9,7 @@ const DOMAIN_EVENTS = Object.freeze({
   SESSION_RESTORED:   "SessionRestored",
   SESSION_CLEARED:    "SessionCleared",
   SESSION_EXPIRED:    "SessionExpired",
+  SESSION_RECONCILED: "SessionReconciled",
 });
 
 const EventBus = (function () {

@@ -61,6 +61,7 @@ const VIEW_ELEMENTS = {
 
 // --- View Controller ---
 function showView(viewId) {
+  console.log("[showView] Solicitada:", viewId, "User:", user, "user.hogarId:", user ? user.hogarId : undefined);
   // Hide all views
   for (const el of Object.values(VIEW_ELEMENTS)) {
     if (el) el.classList.add("hidden");
@@ -69,9 +70,11 @@ function showView(viewId) {
   // Resolve dashboard view dynamically to setup-hogar if no hogarId exists
   let targetViewId = viewId;
   if (viewId === "view-dashboard" && (!user || !user.hogarId)) {
+    console.log("[showView] Guard activado: redirecting from view-dashboard to view-setup-hogar");
     targetViewId = "view-setup-hogar";
   }
 
+  console.log("[showView] Mostrada finalmente:", targetViewId);
   // Show target
   const target = VIEW_ELEMENTS[targetViewId];
   if (target) {
@@ -246,9 +249,10 @@ ui.btnCreateHogar.addEventListener("click", async () => {
 
     const data = await res.json();
     if (res.ok && data.success) {
-      user.hogarId = data.hogar.id;
+      // Create a shallow copy of the user object to avoid mutating a frozen payload
+      const updatedUser = { ...user, hogarId: data.hogar.id };
       // Persist new session details via SessionModule
-      SessionModule.initSession(data.token, user);
+      SessionModule.initSession(data.token, updatedUser);
       showToast("Hogar creado con éxito");
     } else {
       showToast(data.error || "No se pudo crear el hogar");
@@ -487,6 +491,7 @@ const ApplicationOrchestrator = (function () {
   }
 
   function routeToAppView() {
+    console.log("[routeToAppView] Ejecutada. User:", user, "user.hogarId:", user ? user.hogarId : undefined);
     if (user && user.hogarId) {
       showView("view-dashboard");
     } else {
@@ -517,7 +522,12 @@ const ApplicationOrchestrator = (function () {
         setAuthState(AUTH_STATES.SESSION_REHYDRATING, _fsmContext);
         const session = _sessionModule.rehydrateSession();
         if (!session) {
-          setAuthState(AUTH_STATES.EMAIL_ENTRY, _fsmContext);
+          // Guard: rehydrateSession() may have already cleared the session internally
+          // (e.g. schema mismatch, expired JWT), which triggers SessionCleared → EMAIL_ENTRY
+          // via the event listener. Avoid the redundant transition.
+          if (getAuthState() !== AUTH_STATES.EMAIL_ENTRY) {
+            setAuthState(AUTH_STATES.EMAIL_ENTRY, _fsmContext);
+          }
         }
       }
     }

@@ -21,7 +21,7 @@ function checkLocalStorage(content, filename) {
 // Rule 2: Only session-manager.js can emit session lifecycle domain events
 function checkSessionLifecycleEvents(content, filename) {
   if (filename !== 'session-manager.js') {
-    const forbiddenEvents = ['UserAuthenticated', 'SessionRestored', 'SessionCleared', 'SessionExpired'];
+    const forbiddenEvents = ['UserAuthenticated', 'SessionRestored', 'SessionCleared', 'SessionExpired', 'SessionReconciled'];
     forbiddenEvents.forEach(evt => {
       if (content.includes(`"${evt}"`) || content.includes(`'${evt}'`)) {
         // Find if dispatch is called with this event name (e.g. dispatch("UserAuthenticated" or dispatch(DOMAIN_EVENTS.USER_AUTHENTICATED))

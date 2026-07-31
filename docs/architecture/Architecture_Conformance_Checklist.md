@@ -44,6 +44,7 @@ Toda modificación futura del sistema de autenticación, sesión o enrutamiento 
 *   [ ] **4.4. Indepedencia de Expiración:** La lógica de red o infraestructura que intercepta llamadas no autorizadas (ej. HTTP 401) no debe inspeccionar el estado actual de la FSM para actuar; debe invocar directamente a `SessionModule.expireSession()`.
 *   [ ] **4.5. Inmutabilidad de Payloads del Bus:** El `EventBus` debe clonar profundamente (deep clone) y congelar (freeze) todo objeto de payload despachado para evitar que los suscriptores muten los datos del dominio.
 *   [ ] **4.6. Rol del Caché del Orquestador:** Las variables de sesión locales guardadas en el orquestador (`token`, `user`) deben tratarse únicamente como una caché de lectura de presentación. No representan la fuente de verdad para la validez de la sesión de negocio.
+*   [ ] **4.7. Inmutabilidad de Consumo (Domain Event Immutability Rule):** Ningún componente suscriptor al `EventBus` debe mutar directamente las propiedades del payload de un evento recibido. Cualquier modificación requerida sobre el estado del usuario o sesión debe realizarse creando una copia del objeto (ej. `{ ...user, hogarId: ... }`).
 
 ---
 
