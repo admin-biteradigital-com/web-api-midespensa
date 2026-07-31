@@ -37,6 +37,8 @@ const ui = {
   inputProductMin:      document.getElementById("new-product-min"),
   inputProductPrice:    document.getElementById("new-product-price"),
   inputProductCurrency: document.getElementById("new-product-currency"),
+  tabFilterAll:         document.getElementById("tab-filter-all"),
+  tabFilterLow:         document.getElementById("tab-filter-low"),
   dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
   dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
   inventoryContainer:   document.getElementById("inventory-list-container"),
@@ -330,21 +332,34 @@ async function loadEventLogs() {
   }
 }
 
+let activeTab = "ALL"; // "ALL" | "LOW"
+
 // Render dynamic stock cards
 function renderInventoryList(items) {
   ui.inventoryContainer.innerHTML = "";
 
-  if (items.length === 0) {
+  const filteredItems = items.filter(item => {
+    if (activeTab === "LOW") {
+      const minStock = item.min_stock !== undefined ? item.min_stock : 1;
+      return item.quantity <= minStock;
+    }
+    return true;
+  });
+
+  if (filteredItems.length === 0) {
+    const emptyMsg = activeTab === "LOW"
+      ? "¡Excelente! No tienes productos pendientes por recomprar."
+      : "Tu alacena está vacía. ¡Agrega tu primer artículo!";
     ui.inventoryContainer.innerHTML = `
       <div class="empty-state">
         <svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.1 1.7 3.8 3.8 4v7.1c0 .5.4.9.9.9h2.6c.5 0 .9-.4.9-.9V13c2.1-.2 3.8-1.9 3.8-4V2h-2v7zm8-3h-2V2h-2v4h-2V2h-2v4c0 2.2 1.8 4 4 4v9.1c0 .5.4.9.9.9h.2c.5 0 .9-.4.9-.9V10c2.2 0 4-1.8 4-4V2h-2v4z"/></svg>
-        Tu alacena está vacía. ¡Agrega tu primer artículo!
+        ${emptyMsg}
       </div>
     `;
     return;
   }
 
-  items.forEach(item => {
+  filteredItems.forEach(item => {
     const card = document.createElement("div");
     card.className = "product-card";
 
@@ -470,10 +485,27 @@ async function triggerSync() {
   isSyncing = false;
 }
 
-ui.btnRefreshManual.addEventListener("click", () => {
-  triggerSync();
-  showToast("Actualizando datos...");
-});
+if (ui.tabFilterAll && ui.tabFilterLow) {
+  ui.tabFilterAll.addEventListener("click", async () => {
+    activeTab = "ALL";
+    ui.tabFilterAll.style.background = "var(--primary)";
+    ui.tabFilterAll.style.color = "#fff";
+    ui.tabFilterLow.style.background = "transparent";
+    ui.tabFilterLow.style.color = "var(--text-muted)";
+    const items = await getInventoryLocal();
+    renderInventoryList(items);
+  });
+
+  ui.tabFilterLow.addEventListener("click", async () => {
+    activeTab = "LOW";
+    ui.tabFilterLow.style.background = "var(--primary)";
+    ui.tabFilterLow.style.color = "#fff";
+    ui.tabFilterAll.style.background = "transparent";
+    ui.tabFilterAll.style.color = "var(--text-muted)";
+    const items = await getInventoryLocal();
+    renderInventoryList(items);
+  });
+}
 
 // ============================================================================
 // APPLICATION ORCHESTRATOR

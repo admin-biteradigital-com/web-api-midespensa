@@ -156,8 +156,14 @@
 
       <!-- Listado de Stock -->
       <div>
-        <h3 class="section-title" style="margin-bottom: 14px;">
-          <span>Inventario Actual</span>
+        <h3 class="section-title" style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span>Inventario</span>
+            <div class="tab-filters" style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 2px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <button id="tab-filter-all" class="tab-btn active" style="padding: 4px 10px; font-size: 11px; border: none; background: var(--primary); color: #fff; border-radius: 4px; cursor: pointer;">Todos</button>
+              <button id="tab-filter-low" class="tab-btn" style="padding: 4px 10px; font-size: 11px; border: none; background: transparent; color: var(--text-muted); border-radius: 4px; cursor: pointer;">⚠️ Recomprar</button>
+            </div>
+          </div>
           <button id="btn-refresh-manual" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; box-shadow: none;">Actualizar</button>
         </h3>
         <div id="inventory-list-container" class="inventory-list">
