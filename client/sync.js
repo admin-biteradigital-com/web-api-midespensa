@@ -54,14 +54,16 @@ async function syncEngine(token, onStatusChange) {
             body: JSON.stringify({
               product_name: evt.product_name,
               quantity_delta: evt.quantity_delta,
+              category: evt.category || "Almacén",
             }),
           });
 
           if (!res.ok) {
-            const errData = await res.json();
+            const errData = await res.json().catch(() => ({ error: res.statusText }));
             console.warn(
               `Evento offline no pudo sincronizarse: ${evt.product_name}. Error: ${errData.error}`
             );
+            throw new Error(errData.error || `HTTP ${res.status}`);
           }
         } catch (fetchErr) {
           console.error(`Fallo de red al sincronizar evento individual:`, fetchErr);
