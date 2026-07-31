@@ -122,18 +122,30 @@
         <h3 class="section-title" style="font-size: 15px;">Añadir Producto</h3>
         <div class="form-group" style="gap: 10px;">
           <input type="text" id="new-product-name" placeholder="Ej. Leche, Arroz, Café..." style="padding: 10px 12px;">
-          <div style="display: flex; gap: 8px;">
-            <div style="flex: 1;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 75px;">
               <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Cantidad</label>
               <input type="number" id="new-product-qty" min="1" value="1" style="width: 100%; padding: 8px 10px;">
             </div>
-            <div style="flex: 1;">
+            <div style="flex: 1; min-width: 75px;">
               <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Mín. Alerta</label>
               <input type="number" id="new-product-min" min="1" value="1" style="width: 100%; padding: 8px 10px;">
             </div>
-            <div style="flex: 1;">
-              <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Precio ($)</label>
+            <div style="flex: 1; min-width: 90px;">
+              <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Precio</label>
               <input type="number" id="new-product-price" step="0.5" placeholder="Opcional" style="width: 100%; padding: 8px 10px;">
+            </div>
+            <div style="width: 80px;">
+              <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Moneda</label>
+              <select id="new-product-currency" style="width: 100%; padding: 8px 6px; font-size: 12px; background: rgba(0, 0, 0, 0.3); color: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                <option value="UYU" selected>UYU ($)</option>
+                <option value="USD">USD ($)</option>
+                <option value="ARS">ARS ($)</option>
+                <option value="BRL">BRL (R$)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="CLP">CLP ($)</option>
+                <option value="MXN">MXN ($)</option>
+              </select>
             </div>
             <div style="display: flex; align-items: flex-end;">
               <button id="btn-add-product" style="padding: 9px 16px; box-shadow: none; height: 38px;">+ Agregar</button>

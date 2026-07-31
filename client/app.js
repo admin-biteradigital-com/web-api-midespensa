@@ -36,6 +36,7 @@ const ui = {
   inputProductQty:      document.getElementById("new-product-qty"),
   inputProductMin:      document.getElementById("new-product-min"),
   inputProductPrice:    document.getElementById("new-product-price"),
+  inputProductCurrency: document.getElementById("new-product-currency"),
   dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
   dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
   inventoryContainer:   document.getElementById("inventory-list-container"),
@@ -422,6 +423,7 @@ ui.btnCreateProduct.addEventListener("click", async () => {
   const qty = parseInt(ui.inputProductQty ? ui.inputProductQty.value : "1", 10) || 1;
   const minStock = parseInt(ui.inputProductMin ? ui.inputProductMin.value : "1", 10) || 1;
   const priceVal = parseFloat(ui.inputProductPrice ? ui.inputProductPrice.value : "");
+  const currencyVal = ui.inputProductCurrency ? ui.inputProductCurrency.value : "UYU";
 
   if (!name) { showToast("Ingresa el nombre del producto"); return; }
   handleUpdateQuantity(name, "ADD", qty, minStock);
@@ -434,7 +436,7 @@ ui.btnCreateProduct.addEventListener("click", async () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ product_name: name, price: priceVal, currency: "UYU" }),
+        body: JSON.stringify({ product_name: name, price: priceVal, currency: currencyVal }),
       });
     } catch (err) {
       console.warn("No se pudo registrar el precio histórico:", err);
