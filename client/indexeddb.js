@@ -47,6 +47,7 @@ async function saveInventoryLocal(items) {
       store.put({
         product_name: item.product_name,
         quantity: item.quantity,
+        min_stock: item.min_stock !== undefined ? item.min_stock : 1,
         updated_at: item.updated_at
       });
     });
@@ -68,7 +69,7 @@ async function getOfflineEvents() {
   });
 }
 
-async function enqueueOfflineEvent(productName, eventType, quantityDelta) {
+async function enqueueOfflineEvent(productName, eventType, quantityDelta, minStock = 1) {
   const db = await openDB();
   const timestamp = new Date().toISOString();
   
@@ -80,6 +81,7 @@ async function enqueueOfflineEvent(productName, eventType, quantityDelta) {
       product_name: productName,
       event_type: eventType,
       quantity_delta: quantityDelta,
+      min_stock: minStock,
       timestamp: timestamp
     });
     request.onsuccess = () => resolve();
@@ -100,6 +102,7 @@ async function enqueueOfflineEvent(productName, eventType, quantityDelta) {
           store.delete(productName);
         } else {
           existing.quantity = newQty;
+          existing.min_stock = minStock !== undefined ? minStock : existing.min_stock;
           existing.updated_at = timestamp;
           store.put(existing);
         }
@@ -107,6 +110,7 @@ async function enqueueOfflineEvent(productName, eventType, quantityDelta) {
         store.put({
           product_name: productName,
           quantity: quantityDelta,
+          min_stock: minStock,
           updated_at: timestamp
         });
       }

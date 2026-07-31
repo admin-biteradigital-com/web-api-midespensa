@@ -399,7 +399,7 @@ function renderInventoryList(items) {
 // STOCK MANAGEMENT
 // ============================================================================
 
-async function handleUpdateQuantity(productName, eventType, delta) {
+async function handleUpdateQuantity(productName, eventType, delta, minStock = 1) {
   if (eventType === "REMOVE") {
     const currentList = await getInventoryLocal();
     const item = currentList.find(i => i.product_name === productName);
@@ -407,9 +407,10 @@ async function handleUpdateQuantity(productName, eventType, delta) {
       showToast("La cantidad no puede ser menor a cero");
       return;
     }
+    minStock = item.min_stock !== undefined ? item.min_stock : 1;
   }
 
-  await enqueueOfflineEvent(productName, eventType, delta);
+  await enqueueOfflineEvent(productName, eventType, delta, minStock);
   const localInventory = await getInventoryLocal();
   renderInventoryList(localInventory);
   triggerSync();
@@ -418,10 +419,12 @@ async function handleUpdateQuantity(productName, eventType, delta) {
 ui.btnCreateProduct.addEventListener("click", () => {
   const name = ui.inputProductName.value.trim();
   const qty = parseInt(ui.inputProductQty ? ui.inputProductQty.value : "1", 10) || 1;
+  const minStock = parseInt(ui.inputProductMin ? ui.inputProductMin.value : "1", 10) || 1;
   if (!name) { showToast("Ingresa el nombre del producto"); return; }
-  handleUpdateQuantity(name, "ADD", qty);
+  handleUpdateQuantity(name, "ADD", qty, minStock);
   ui.inputProductName.value = "";
   if (ui.inputProductQty) ui.inputProductQty.value = "1";
+  if (ui.inputProductMin) ui.inputProductMin.value = "1";
 });
 
 // ============================================================================
