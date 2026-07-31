@@ -2,6 +2,8 @@
 
 Este documento formaliza la trazabilidad histórica, el estado actual y la hoja de ruta (**Roadmap Maestro**) de la plataforma **Mi Despensa**, alineando los requerimientos de arquitectura, calidad de código y las metas de experiencia de usuario (**UI/UX**) bajo la gobernanza de **Bitera Digital SAS**.
 
+> **Última actualización:** 2026-07-31 — Sprint 4 Analytics completado. Sprint 5 planificado.
+
 ---
 
 ## 1. Matriz de Estado Histórico y Progreso de Sprints
@@ -15,9 +17,10 @@ Este documento formaliza la trazabilidad histórica, el estado actual y la hoja 
 | **Sprint 2 (Slice 4b)** | Historial de Precios + Bitácora D1 + Modal UI + Multimoneda | **✅ Completado** | Pass | Tabla `historial_precios`, `/api/v1/prices`, Selector Multimoneda (default UYU), Modal PWA |
 | **Sprint 2.5 (UI/UX)** | Filtros por Pestaña + Buscador Instantáneo + KPI Dashboard Cards | **✅ Completado** | Pass | Tabs (Todos/Recomprar), Live Search Bar, Tarjetas KPI Resumen (Total e Ítems Bajos) |
 | **Sprint 2.6 (Hogares)**| Unión a Hogares Compartidos (Código de Invitación / QR) | **✅ Completado** | Pass | Endpoint `/api/v1/hogar/join`, Código de Invitación copiable, Flujo Multi-Usuario |
-| **Sprint 3 (Epic 2)** | Categorización Visual y Organización por Pasillo (D1 & PWA) | **✅ Completado** | Pass | Columna `category` en D1, Pinta de Píldoras de Filtro por Pasillo, Insignia de Categoría en PWA |
-| **Sprint 3 (Epic 1)** | Escáner de Códigos de Barra en PWA (`UI/UX Barcode Scanner`) | **✅ Completado** | Pass | `barcode.js` BarcodeDetector API, Modal Viewfinder, fallback para browsers sin soporte |
-| **Sprint 4 (Próximo)** | Reportes de Consumo Doméstico + Exportación CSV/PDF | ⏳ **Planificado** | Pending | Gráficas de Tendencia de Gasto y consumo mensual de alacena |
+| **Sprint 3 (Epic 2)** | Categorización Visual y Organización por Pasillo (D1 & PWA) | **✅ Completado** | Pass | Columna `category` en D1 remota (migración), Pills de filtro por pasillo, Badge de categoría |
+| **Sprint 3 (Epic 1)** | Escáner de Códigos de Barra en PWA (`UI/UX Barcode Scanner`) | **✅ Completado** | Pass | `barcode.js` BarcodeDetector API, Modal Viewfinder, Fallback elegante para browsers sin soporte |
+| **Sprint 4 (Analytics)** | Reportes de Consumo Doméstico + Exportación CSV | **✅ Completado** | Pass | `analytics.js` Canvas bar chart, Top Productos ranking, Resumen por categoría, CSV con BOM, Nav tabs Inventario/Reportes, KPI Valor Stock |
+| **Sprint 5 (Próximo)** | Notificaciones Push de Stock Bajo + Lista de Compras Inteligente | ⏳ **Planificado** | Pending | Web Push API, sugerencias basadas en historial de precios, agrupación por supermercado |
 
 ---
 
@@ -29,37 +32,83 @@ graph TD
     S1 --> S2[Sprint 2: Precios, Outbox Offline & Multi-Hogar]
     S2 --> S25[Sprint 2.5: UI/UX Live Search, Tabs & KPI Metrics]
     S25 --> S3[Sprint 3: Escáner Barcode PWA & Categorización Visual]
-    S3 --> S4[Sprint 4: Analytics de Consumo & Reportes Exportables]
+    S3 --> S4[Sprint 4: Analytics de Consumo & Reportes CSV]
+    S4 --> S5[Sprint 5: Notificaciones Push & Lista de Compras Inteligente]
+    S5 --> S6[Sprint 6+: Comparador de Precios & Social Features]
 ```
 
 ---
 
-## 3. Plan Detallado del Sprint 3 (Próxima Fase UI/UX)
+## 3. Plan Detallado del Sprint 4 (Completado)
 
-### 🎯 Objetivo del Sprint 3
-Enriquecer significativamente la usabilidad táctil y móvil de la PWA agregando reconocimiento de códigos de barra mediante la cámara del smartphone y categorización visual intuitiva de los alimentos y productos del hogar.
+### 🎯 Objetivo del Sprint 4
+Dar visibilidad al usuario sobre el estado real de su alacena: cuánto gasta por categoría, qué productos tiene en mayor cantidad y exportar el inventario para uso externo.
 
-### 📝 Epics & Historias de Usuario
+### 📝 Entregables
 
-#### Epic 1: Escáner de Códigos de Barra en PWA (`UI/UX Barcode Scanner`)
-* **Historia:** Como usuario en el supermercado o en la cocina, quiero escanear el código de barras de un producto desde la cámara de mi teléfono para buscarlo o agregarlo instantáneamente sin escribir.
-* **Criterios de Aceptación:**
-  1. Uso de la API nativa de JavaScript `BarcodeDetector` (con fallback de librerías ultralivianas sin dependencias pesadas).
-  2. Botón flotante `📷 Escanear` en la barra de producto.
-  3. Autocompletado del nombre del producto y actualización inmediata de stock.
+#### Epic 1: Analytics de Consumo Doméstico
+* Gráfico de barras animado (Canvas API nativo, 0 dependencias) con **gasto estimado por categoría**.
+* **Top 6 productos** con mayor stock en ranking con barras de progreso y medallas.
+* **Resumen por categoría**: count de productos, unidades totales y valor estimado.
+* Tarjeta KPI **"Valor Stock"** en el header del dashboard (total de unidades).
+* Navegación por **tabs Inventario / Reportes** en el dashboard principal.
 
-#### Epic 2: Categorización Visual y Organización por Pasillo (`Product Categorization`)
-* **Historia:** Como miembro del hogar, quiero clasificar los productos por categoría (ej. *Lácteos, Limpieza, Bebidas, Almacén*) para visualizar la alacena organizada como un supermercado.
-* **Criterios de Aceptación:**
-  1. Selector de categoría en el alta del producto.
-  2. Filtros de pasillo/categoría en el Dashboard principal de la PWA.
-  3. Código de colores e íconos distintivos por categoría.
+#### Epic 2: Exportación CSV
+* Botón "Descargar Inventario CSV" en el panel de Reportes.
+* Archivo con BOM UTF-8 para compatibilidad con Excel y LibreOffice.
+* Columnas: Producto, Categoría, Cantidad, Stock Mínimo, Última Actualización.
+* Nombre del archivo con fecha actual (`midespensa-inventario-YYYY-MM-DD.csv`).
+
+#### Correcciones Técnicas Incluidas
+* Migración D1 remota: columnas `category` y `min_stock` aplicadas en Cloudflare.
+* Service Worker bumped a `v4` con `analytics.js` en caché offline.
 
 ---
 
-## 4. Gobernanza y Métricas Inquebrantables de Calidad
+## 4. Plan del Sprint 5 (Próxima Fase)
 
-* **Costo Operativo:** Strict **USD 0** (Sin servicios comerciales pagos, sin Cron Jobs desatendidos).
-* **Cobertura de Código:** Cobertura de pruebas unitarias en el Edge Worker **>= 85%**.
-* **Arquitectura:** 0 violaciones detectadas por `node ./scripts/check-architecture.js`.
-* **TypeScript:** Compilación limpia con 0 errores `npx tsc`.
+### 🎯 Objetivo del Sprint 5
+Convertir Mi Despensa en una herramienta **proactiva**: que le avise al usuario cuando debe comprar y le facilite la lista de compras organizada.
+
+### 📝 Epics Planificadas
+
+#### Epic 1: Notificaciones Push de Stock Bajo
+* Registrar Service Worker Push Subscription via **Web Push API** (VAPID).
+* Worker de Cloudflare envía notificación cuando algún producto cruza el umbral `min_stock`.
+* Opción de configurar horario preferido de notificación (mañana / noche).
+* Costo: **USD 0** usando Cloudflare Workers + Scheduled Triggers.
+
+#### Epic 2: Lista de Compras Inteligente
+* Endpoint `/api/v1/shopping-list` ya existente → enriquecerlo con historial de precios.
+* Vista dedicada de Lista de Compras con:
+  - Agrupación por categoría (simula recorrido por pasillo del súper).
+  - Precio de referencia del último registro.
+  - Checkbox de "ya lo compré" → actualiza stock automáticamente.
+* Compartir lista vía Web Share API (link o texto plano).
+
+---
+
+## 5. Gobernanza y Métricas Inquebrantables de Calidad
+
+| Dimensión | Meta | Estado actual |
+| :--- | :---: | :---: |
+| **Costo Operativo** | USD 0 | ✅ |
+| **Cobertura de Tests** | ≥ 85% (89 tests, 11 suites) | ✅ |
+| **Arquitectura** | 0 violaciones `check-architecture.js` | ✅ |
+| **TypeScript** | 0 errores `tsc` | ✅ |
+| **Sync Badge** | Sin error en producción | ✅ (D1 migrada) |
+
+---
+
+## 6. Historial de Commits Significativos
+
+| Commit | Descripción |
+| :--- | :--- |
+| `a4314dd` | docs(roadmap): Sprint 3 completamente cerrado |
+| `59cd372` | feat(sprint-3-epic-1): Barcode Scanner PWA + BarcodeDetector API |
+| `b6a5b74` | feat(sprint-3-epic-2): Categorización visual + D1 category column |
+| `6e79ed3` | feat(sprint-4): Analytics Canvas, CSV Export, nav tabs, KPI |
+
+---
+
+*Documento vivo — actualizarlo en cada cierre de sprint. Fuente de verdad del roadmap del producto.*
