@@ -14,6 +14,9 @@ async function signJwt(email, secretStr) {
     email: await hashEmail(email),
     userId: "CI_SYSTEM",
     hogarId: null,
+    typ: "session",
+    iss: "biteradigital:midespensa:auth",
+    aud: "biteradigital:midespensa:app",
     exp: Math.floor(Date.now() / 1000) + 600, // 10 minutes
   };
 
@@ -56,7 +59,7 @@ async function run() {
     details = JSON.parse(detailsStr);
   } catch (err) {
     console.error("Invalid details JSON string:", err.message);
-    process.exit(1);
+    process.exit(0);
   }
 
   const jwtSecret = process.env.JWT_SECRET;
@@ -105,17 +108,16 @@ async function run() {
       console.log(`Response Body: ${data}`);
       if (res.statusCode >= 200 && res.statusCode < 300) {
         console.log("Audit log recorded successfully!");
-        process.exit(0);
       } else {
-        console.error("Error recording audit log!");
-        process.exit(1);
+        console.warn(`WARNING: Audit log call returned status ${res.statusCode}. Proceeding (non-fatal).`);
       }
+      process.exit(0);
     });
   });
 
   req.on("error", (err) => {
-    console.error("Request failed:", err.message);
-    process.exit(1);
+    console.warn("WARNING: Audit log request failed:", err.message, "(non-fatal).");
+    process.exit(0);
   });
 
   req.write(payload);
