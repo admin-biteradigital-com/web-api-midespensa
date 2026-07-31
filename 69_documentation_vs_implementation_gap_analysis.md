@@ -23,8 +23,9 @@ Este documento realiza un contraste detallado entre los requerimientos, decision
 | **Proyección de Inventario (Materialized View)** | Doc 09, 12, 58, 67 | **✅** | La tabla `inventario` almacena el stock actual consolidado para optimizar lecturas del Dashboard. Implementado. |
 | **Sincronización Transaccional** | Doc 12, 58, 67 | **✅** | La inserción en `events_stock` y la actualización/inserción en `inventario` ocurren de forma atómica en una única transacción de D1 vía `db.batch()`. |
 | **Multi-Hogar por Usuario** | Doc 03, 05 | **🔴** | No implementado. Actualmente el claim `hogarId` en el JWT es único y no hay tabla asociativa de membresías múltiples. El MVP asume un usuario = un hogar. |
-| **Alertas de Stock Mínimo** | Doc 03, 15 | **🔴** | No implementado en código. La tabla `inventario` actual no posee columnas de `stock_minimo` (diferido a V1). |
+| **Alertas de Stock Mínimo** | Doc 03, 15 | **✅** | Implementado en Sprint 1. Tabla `inventario` incluye `min_stock`, PWA renderiza insignia '⚠️ Recomprar' y tab de filtro rápido. |
 | **Historial de Fechas de Vencimiento** | Doc 05, 12 | **⚫** | Obsoleto para el MVP. Reemplazado por el log simplificado de eventos de stock (`events_stock`). |
+| **Historial de Precios por Producto (Slice 4b)** | Doc 51, 52, 53 | **✅** | Implementado en Sprint 2. Tabla `historial_precios` en D1, endpoint `/api/v1/prices`, selector multimoneda (default UYU) y modal visual en PWA. |
 
 ### 2.2. Seguridad e Identidad (Identity & Access)
 
@@ -34,8 +35,9 @@ Este documento realiza un contraste detallado entre los requerimientos, decision
 | **Validación de Firma JWT** | Doc 06, 32 | **✅** | Implementado en `worker/src/middleware/auth.ts` usando la librería `jose`. |
 | **Algoritmo JWT (HS256)** | Doc 06, 52, 67 (ADR) | **✅** | Implementado firma y verificación simétrica HS256 utilizando la Web Crypto API nativa a través de `jose`. ES256 y Ed25519 quedan diferidos. |
 | **Separación Control vs. Data Plane** | Doc 63, 64 | **✅** | Enrutamiento e identidades aisladas. `admin@biteradigital.com` no posee registros operativos en la base de datos de producción. |
-| **Magic Links con Token Temporal** | Doc 03, 32, docs/sprint_0_patch | **🟡** | Parcialmente implementado. Se genera un JWT temporal con validez de 10 min y se expone por consola y debugUrl. Falta la integración directa con la API de Resend para envío por correo. |
+| **Magic Links con Token Temporal (Resend API)** | Doc 03, 32, 71 | **✅** | Implementado en Sprint 1 (Gate A / GAP-01). Envíos reales vía Resend API con revocación por tabla `consumed_tokens`. |
 | **Tenant Enforcement Layer (TEL)** | Doc 05, 32, 34, 57, 58 | **✅** | Implementada la clase `D1QueryGate` en `worker/src/middleware/tel.ts` que intercepta las sentencias SQL y rechaza la ejecución si falta `hogar_id`. |
+| **Audit Evidence Provider (`auditoria_legal`)** | Doc 41, 48, 64, 71 | **✅** | Implementado en Sprint 1 (Gate A / GAP-02). Tabla `auditoria_legal` en D1 con firma HMAC-SHA256 y hash-chain inalterable en `D1AuditEvidenceProvider`. |
 | **Cookies HTTP-Only Seguras** | Doc 06, 62 | **🔴** | No implementado. El MVP actual transmite el JWT a través del encabezado `Authorization: Bearer <token>` para simplificar la interoperabilidad de la PWA. |
 
 ### 2.3. Almacenamiento Local y Offline (PWA)
@@ -43,8 +45,8 @@ Este documento realiza un contraste detallado entre los requerimientos, decision
 | Requisito / Concepto | Documentos Relacionados | Estado | Implementación Real en Sprint 0 / Brecha |
 | :--- | :--- | :---: | :--- |
 | **Cache de Assets Estáticos** | Doc 04, 05, 14, 46 | **✅** | `client/sw.js` implementa Service Worker con estrategia de almacenamiento en cache y recuperación offline de la UI. |
-| **Copia Local del Inventario** | Doc 04, 14, 20, 52 | **✅** | Implementado uso de IndexedDB en `client/indexeddb.js` y `client/app.js` para persistencia local del estado del inventario. |
-| **Cola Offline de Transacciones** | Doc 14, 52 | **🟡** | Parcialmente implementado. `client/sync.js` maneja la cola en IndexedDB para registrar adiciones/sustracciones de stock offline. Falta la resolución automatizada de conflictos bidireccional compleja. |
+| **Copia Local del Inventario** | Doc 04, 14, 20, 52 | **✅** | Implementado uso de IndexedDB en `client/indexeddb.js` y `client/app.js` para persistencia local del estado del inventario incluyendo `min_stock`. |
+| **Cola Offline de Transacciones (Outbox Queue)** | Doc 14, 52 | **✅** | Implementado en Sprint 1 (Hito 2 / GAP-06). `client/sync.js` maneja la cola en IndexedDB para registrar adiciones/sustracciones de stock offline y vaciado automático al recuperar conexión. |
 | **Sincronización en Tiempo Real** | Doc 01, 05, 10 | **⚫** | Obsoleto para el MVP. Reemplazado por sincronización bajo demanda y reintento en segundo plano (Free Tier compliance). |
 
 ### 2.4. Infraestructura y Límites Financieros
