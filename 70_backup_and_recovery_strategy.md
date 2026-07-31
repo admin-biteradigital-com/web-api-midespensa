@@ -17,15 +17,15 @@ Este documento establece la estrategia formal de contingencia, respaldo de datos
 
 Para cumplir con la restricción de **Costo Operativo = USD 0**, no se utilizarán herramientas comerciales de backup. Se implementa un flujo automatizado de bajo consumo a nivel de Control Plane:
 
-### 2.1. Exportación Diaria de D1 (D1 Daily Export)
-*   **Mecanismo:** Un flujo de GitHub Actions ejecutándose periódicamente mediante un cron job diario (`cron: "0 4 * * *"`) que realiza las siguientes operaciones a nivel de Control Plane:
-    1.  Ejecuta el CLI de Wrangler para generar un volcado SQL de la base de datos de producción:
+### 2.1. Exportación Bajo Demanda / Manual de D1 (Zero-Cost Manual Backup)
+*   **Mecanismo:** Un flujo de GitHub Actions con disparo manual exclusivo (`workflow_dispatch`) para evitar consumos innecesarios de cuota de API, lecturas D1 y minutos de GitHub Actions. Operaciones del Control Plane:
+    1.  Ejecuta el CLI de Wrangler para generar un volcado SQL de la base de datos bajo demanda:
         ```bash
         npx wrangler d1 export midespensa-db --remote --output ./backup.sql
         ```
     2.  Comprime el archivo generado usando compresión Gzip.
-    3.  Almacena el backup comprimido en un repositorio privado de GitHub dedicado exclusivamente a históricos de base de datos (`biteradigital-midespensa-backups`).
-*   **Política de Retención:** Los volcados se conservan durante **30 días** en el repositorio privado de backups. Transcurrido ese plazo, un script del pipeline depura los archivos más antiguos de forma automática.
+    3.  Almacena el backup comprimido en el historial del repositorio.
+*   **Garantía Financiera:** **Costo USD 0 absoluto.** Sin tareas programadas desatendidas (Cron deshabilitado) para evitar cualquier riesgo de cargos o sobreconsumos indeseados.
 
 ---
 
