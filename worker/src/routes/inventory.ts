@@ -359,3 +359,42 @@ export async function handleRebuildInventory(
     });
   }
 }
+
+export async function handleGetShoppingList(
+  request: Request,
+  queryGate: D1QueryGate,
+  userSession: JWTPayload
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  const hogarId = userSession.hogarId;
+  if (!hogarId) {
+    return new Response(
+      JSON.stringify({ error: "User is not associated with any household" }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  try {
+    const tenantCtx = new TenantContext(hogarId);
+    const shoppingItems = await queryGate.executeTenantQuery<DBInventario>(
+      tenantCtx,
+      "SELECT id, hogar_id, product_name, quantity, min_stock, updated_at FROM inventario WHERE hogar_id = ? AND quantity <= min_stock ORDER BY product_name ASC",
+      [hogarId]
+    );
+
+    return new Response(JSON.stringify({ success: true, shopping_list: shoppingItems }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}

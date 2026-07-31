@@ -2,7 +2,7 @@ import { authMiddleware } from "./middleware/auth";
 import { D1QueryGate } from "./middleware/tel";
 import { handleMagicLink, handleVerifyMagicLink } from "./routes/auth";
 import { handleCreateHogar, handleGetHogar } from "./routes/hogar";
-import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory } from "./routes/inventory";
+import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory, handleGetShoppingList } from "./routes/inventory";
 import { handleGetEventsStock, handleRecordAuditLog } from "./routes/events";
 import { runSmokeTests } from "./utils/smoke";
 import { API_ROUTES } from "../../shared/constants";
@@ -97,6 +97,10 @@ export default {
 
       if (path === API_ROUTES.INVENTORY_REMOVE) {
         return injectCors(await handleInventoryRemove(request, queryGate, userSession, auditProvider));
+      }
+
+      if (path === API_ROUTES.SHOPPING_LIST) {
+        return injectCors(await handleGetShoppingList(request, queryGate, userSession));
       }
 
       if (path === API_ROUTES.EVENTS) {

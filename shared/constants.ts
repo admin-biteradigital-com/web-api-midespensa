@@ -5,5 +5,6 @@ export const API_ROUTES = {
   INVENTORY: "/api/v1/inventory",
   INVENTORY_ADD: "/api/v1/inventory/add",
   INVENTORY_REMOVE: "/api/v1/inventory/remove",
+  SHOPPING_LIST: "/api/v1/shopping-list",
   EVENTS: "/api/v1/events_stock",
 };
