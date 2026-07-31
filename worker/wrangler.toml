@@ -3,9 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2024-05-02"
 workers_dev = true
 
-routes = [
-  { pattern = "midespensa.biteradigital.com/api/*", zone_name = "biteradigital.com" }
-]
+
 
 [[d1_databases]]
 binding = "DB"
