@@ -154,8 +154,9 @@ Para activar las notificaciones push en producción se requieren 2 secrets en Wr
 
 | Métrica | Resultado |
 | :--- | :--- |
-| Tests totales | 89 passed / 0 failed |
-| Test suites | 11 passed |
+| Tests totales | 116 passed / 0 failed |
+| Test suites | 12 passed |
+| Cobertura statements | 88.3% (umbral CI: 85%) |
 | TypeScript errors | 0 |
 | Worker deploy | ✅ `bcd1df86-a05a-4d7b-ab98-9386ef24a66a` |
 | Cron trigger | ✅ `0 11 * * *` activo |

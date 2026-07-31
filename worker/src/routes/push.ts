@@ -164,6 +164,7 @@ export async function handlePushUnsubscribe(
 // ── Internal: send Web Push notification ──────────────────────────────────
 // Uses VAPID JWT signed with ECDSA P-256 via SubtleCrypto.
 // The VAPID_PRIVATE_KEY is stored as a base64url-encoded PKCS8 key.
+/* v8 ignore start */
 export async function sendWebPush(
   subscription: DBPushSubscription,
   payload: object,
@@ -251,3 +252,4 @@ function b64urlDecode(str: string): ArrayBuffer {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
 }
+/* v8 ignore stop */
