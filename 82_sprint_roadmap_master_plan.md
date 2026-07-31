@@ -15,7 +15,8 @@ Este documento formaliza la trazabilidad histórica, el estado actual y la hoja 
 | **Sprint 2 (Slice 4b)** | Historial de Precios + Bitácora D1 + Modal UI + Multimoneda | **✅ Completado** | Pass | Tabla `historial_precios`, `/api/v1/prices`, Selector Multimoneda (default UYU), Modal PWA |
 | **Sprint 2.5 (UI/UX)** | Filtros por Pestaña + Buscador Instantáneo + KPI Dashboard Cards | **✅ Completado** | Pass | Tabs (Todos/Recomprar), Live Search Bar, Tarjetas KPI Resumen (Total e Ítems Bajos) |
 | **Sprint 2.6 (Hogares)**| Unión a Hogares Compartidos (Código de Invitación / QR) | **✅ Completado** | Pass | Endpoint `/api/v1/hogar/join`, Código de Invitación copiable, Flujo Multi-Usuario |
-| **Sprint 3 (Próximo)** | Escáner de Códigos de Barra (WebCam) + Categorías de Productos | ⏳ **Planificado** | Pending | Integración Barcode Detector API, Agrupamiento Visual por Categoría |
+| **Sprint 3 (Epic 2)** | Categorización Visual y Organización por Pasillo (D1 & PWA) | **✅ Completado** | Pass | Columna `category` en D1, Pinta de Píldoras de Filtro por Pasillo, Insignia de Categoría en PWA |
+| **Sprint 3 (Epic 1)** | Escáner de Códigos de Barra en PWA (`UI/UX Barcode Scanner`) | ⏳ **En progreso** | Pending | Integración Barcode Detector API |
 | **Sprint 4 (Próximo)** | Reportes de Consumo Doméstico + Exportación CSV/PDF | ⏳ **Planificado** | Pending | Gráficas de Tendencia de Gasto y consumo mensual de alacena |
 
 ---
