@@ -39,6 +39,10 @@ const ui = {
   inputProductCurrency: document.getElementById("new-product-currency"),
   tabFilterAll:         document.getElementById("tab-filter-all"),
   tabFilterLow:         document.getElementById("tab-filter-low"),
+  modalPriceHistory:    document.getElementById("modal-price-history"),
+  modalPriceTitle:      document.getElementById("modal-price-title"),
+  modalPriceList:       document.getElementById("modal-price-list"),
+  btnClosePriceModal:   document.getElementById("btn-close-price-modal"),
   dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
   dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
   inventoryContainer:   document.getElementById("inventory-list-container"),
@@ -382,8 +386,18 @@ function renderInventoryList(items) {
     updated.className = "product-updated";
     updated.textContent = `Actualizado: ${new Date(item.updated_at).toLocaleTimeString()}`;
 
+    const btnPrices = document.createElement("button");
+    btnPrices.className = "btn-secondary";
+    btnPrices.style.padding = "2px 6px";
+    btnPrices.style.fontSize = "10px";
+    btnPrices.style.marginTop = "4px";
+    btnPrices.style.boxShadow = "none";
+    btnPrices.textContent = "📊 Ver Precios";
+    btnPrices.addEventListener("click", () => openPriceHistoryModal(item.product_name));
+
     info.appendChild(name);
     info.appendChild(updated);
+    info.appendChild(btnPrices);
 
     const controls = document.createElement("div");
     controls.className = "quantity-controls";
@@ -485,26 +499,66 @@ async function triggerSync() {
   isSyncing = false;
 }
 
-if (ui.tabFilterAll && ui.tabFilterLow) {
-  ui.tabFilterAll.addEventListener("click", async () => {
-    activeTab = "ALL";
-    ui.tabFilterAll.style.background = "var(--primary)";
-    ui.tabFilterAll.style.color = "#fff";
-    ui.tabFilterLow.style.background = "transparent";
-    ui.tabFilterLow.style.color = "var(--text-muted)";
-    const items = await getInventoryLocal();
-    renderInventoryList(items);
+if (ui.btnClosePriceModal && ui.modalPriceHistory) {
+  ui.btnClosePriceModal.addEventListener("click", () => {
+    ui.modalPriceHistory.classList.add("hidden");
   });
+}
 
-  ui.tabFilterLow.addEventListener("click", async () => {
-    activeTab = "LOW";
-    ui.tabFilterLow.style.background = "var(--primary)";
-    ui.tabFilterLow.style.color = "#fff";
-    ui.tabFilterAll.style.background = "transparent";
-    ui.tabFilterAll.style.color = "var(--text-muted)";
-    const items = await getInventoryLocal();
-    renderInventoryList(items);
-  });
+async function openPriceHistoryModal(productName) {
+  if (!ui.modalPriceHistory || !ui.modalPriceTitle || !ui.modalPriceList) return;
+
+  ui.modalPriceTitle.textContent = `Precios: ${productName}`;
+  ui.modalPriceList.innerHTML = `<div style="font-size: 12px; color: var(--text-muted);">Cargando historial...</div>`;
+  ui.modalPriceHistory.classList.remove("hidden");
+
+  if (!token) {
+    ui.modalPriceList.innerHTML = `<div style="font-size: 12px; color: var(--accent-red);">Inicia sesión para ver precios.</div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/prices?product_name=${encodeURIComponent(productName)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) throw new Error("No se pudo obtener el historial de precios");
+
+    const data = await res.json();
+    const history = data.price_history || [];
+
+    if (history.length === 0) {
+      ui.modalPriceList.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 12px 0; text-align: center;">No hay precios registrados para este producto.</div>`;
+      return;
+    }
+
+    ui.modalPriceList.innerHTML = "";
+    history.forEach(p => {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.justifyContent = "space-between";
+      row.style.padding = "8px 12px";
+      row.style.borderRadius = "var(--radius-sm)";
+      row.style.background = "rgba(0, 0, 0, 0.2)";
+      row.style.fontSize = "12px";
+
+      const priceTag = document.createElement("span");
+      priceTag.style.fontWeight = "600";
+      priceTag.style.color = "var(--accent-green)";
+      priceTag.textContent = `${p.currency} $${p.price.toFixed(2)}`;
+
+      const timeTag = document.createElement("span");
+      timeTag.style.color = "var(--text-muted)";
+      timeTag.style.fontSize = "11px";
+      timeTag.textContent = new Date(p.timestamp).toLocaleDateString();
+
+      row.appendChild(priceTag);
+      row.appendChild(timeTag);
+      ui.modalPriceList.appendChild(row);
+    });
+  } catch (err) {
+    ui.modalPriceList.innerHTML = `<div style="font-size: 12px; color: var(--accent-red);">Error al cargar precios.</div>`;
+  }
 }
 
 // ============================================================================

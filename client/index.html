@@ -196,6 +196,19 @@
   <!-- Toast Notificaciones -->
   <div id="toast" class="toast">Notificación</div>
 
+  <!-- Modal Historial de Precios -->
+  <div id="modal-price-history" class="modal-overlay hidden">
+    <div class="glass-card" style="width: 90%; max-width: 420px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 id="modal-price-title" style="font-size: 16px; font-weight: 600;">Historial de Precios</h3>
+        <button id="btn-close-price-modal" style="background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px;">✕</button>
+      </div>
+      <div id="modal-price-list" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+        <!-- Dinámico -->
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts de la PWA -->
   <script src="indexeddb.js"></script>
   <script src="sync.js"></script>
