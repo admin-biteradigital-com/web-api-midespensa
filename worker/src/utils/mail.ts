@@ -24,6 +24,7 @@ export async function sendMagicLink(
   }
 
   try {
+    const uniqueCode = Math.floor(100000 + Math.random() * 900000);
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -33,7 +34,7 @@ export async function sendMagicLink(
       body: JSON.stringify({
         from: "Mi Despensa <no-reply@biteradigital.com>",
         to: [email],
-        subject: "Tu enlace de acceso a Mi Despensa",
+        subject: `Tu enlace de acceso a Mi Despensa [#${uniqueCode}]`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
             <h2 style="color: #333;">¡Hola!</h2>
