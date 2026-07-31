@@ -39,6 +39,7 @@ const ui = {
   inputProductCurrency: document.getElementById("new-product-currency"),
   tabFilterAll:         document.getElementById("tab-filter-all"),
   tabFilterLow:         document.getElementById("tab-filter-low"),
+  inputSearchInventory: document.getElementById("input-search-inventory"),
   modalPriceHistory:    document.getElementById("modal-price-history"),
   modalPriceTitle:      document.getElementById("modal-price-title"),
   modalPriceList:       document.getElementById("modal-price-list"),
@@ -337,23 +338,28 @@ async function loadEventLogs() {
 }
 
 let activeTab = "ALL"; // "ALL" | "LOW"
+let searchQuery = "";
 
 // Render dynamic stock cards
 function renderInventoryList(items) {
   ui.inventoryContainer.innerHTML = "";
 
   const filteredItems = items.filter(item => {
-    if (activeTab === "LOW") {
-      const minStock = item.min_stock !== undefined ? item.min_stock : 1;
-      return item.quantity <= minStock;
-    }
-    return true;
+    const matchesTab = activeTab === "LOW"
+      ? item.quantity <= (item.min_stock !== undefined ? item.min_stock : 1)
+      : true;
+    const matchesQuery = searchQuery
+      ? item.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+      : true;
+    return matchesTab && matchesQuery;
   });
 
   if (filteredItems.length === 0) {
-    const emptyMsg = activeTab === "LOW"
-      ? "¡Excelente! No tienes productos pendientes por recomprar."
-      : "Tu alacena está vacía. ¡Agrega tu primer artículo!";
+    const emptyMsg = searchQuery
+      ? `No se encontraron productos que coincidan con "${searchQuery}".`
+      : (activeTab === "LOW"
+          ? "¡Excelente! No tienes productos pendientes por recomprar."
+          : "Tu alacena está vacía. ¡Agrega tu primer artículo!");
     ui.inventoryContainer.innerHTML = `
       <div class="empty-state">
         <svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.1 1.7 3.8 3.8 4v7.1c0 .5.4.9.9.9h2.6c.5 0 .9-.4.9-.9V13c2.1-.2 3.8-1.9 3.8-4V2h-2v7zm8-3h-2V2h-2v4h-2V2h-2v4c0 2.2 1.8 4 4 4v9.1c0 .5.4.9.9.9h.2c.5 0 .9-.4.9-.9V10c2.2 0 4-1.8 4-4V2h-2v4z"/></svg>
@@ -497,6 +503,14 @@ async function triggerSync() {
   }
 
   isSyncing = false;
+}
+
+if (ui.inputSearchInventory) {
+  ui.inputSearchInventory.addEventListener("input", async (e) => {
+    searchQuery = e.target.value.trim();
+    const items = await getInventoryLocal();
+    renderInventoryList(items);
+  });
 }
 
 if (ui.btnClosePriceModal && ui.modalPriceHistory) {
