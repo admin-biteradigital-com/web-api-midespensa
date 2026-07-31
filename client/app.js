@@ -35,6 +35,7 @@ const ui = {
   inputProductName:     document.getElementById("new-product-name"),
   inputProductQty:      document.getElementById("new-product-qty"),
   inputProductMin:      document.getElementById("new-product-min"),
+  inputProductPrice:    document.getElementById("new-product-price"),
   dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
   dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
   inventoryContainer:   document.getElementById("inventory-list-container"),
@@ -416,15 +417,34 @@ async function handleUpdateQuantity(productName, eventType, delta, minStock = 1)
   triggerSync();
 }
 
-ui.btnCreateProduct.addEventListener("click", () => {
+ui.btnCreateProduct.addEventListener("click", async () => {
   const name = ui.inputProductName.value.trim();
   const qty = parseInt(ui.inputProductQty ? ui.inputProductQty.value : "1", 10) || 1;
   const minStock = parseInt(ui.inputProductMin ? ui.inputProductMin.value : "1", 10) || 1;
+  const priceVal = parseFloat(ui.inputProductPrice ? ui.inputProductPrice.value : "");
+
   if (!name) { showToast("Ingresa el nombre del producto"); return; }
   handleUpdateQuantity(name, "ADD", qty, minStock);
+
+  if (!isNaN(priceVal) && priceVal > 0 && token) {
+    try {
+      await fetch(`${API_BASE}/api/v1/prices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ product_name: name, price: priceVal, currency: "UYU" }),
+      });
+    } catch (err) {
+      console.warn("No se pudo registrar el precio histórico:", err);
+    }
+  }
+
   ui.inputProductName.value = "";
   if (ui.inputProductQty) ui.inputProductQty.value = "1";
   if (ui.inputProductMin) ui.inputProductMin.value = "1";
+  if (ui.inputProductPrice) ui.inputProductPrice.value = "";
 });
 
 // ============================================================================

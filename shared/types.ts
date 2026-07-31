@@ -16,7 +16,18 @@ export interface DBInventario {
   hogar_id: string;
   product_name: string;
   quantity: number;
+  min_stock?: number;
   updated_at: string;
+}
+
+export interface DBHistorialPrecio {
+  id: string;
+  hogar_id: string;
+  product_name: string;
+  price: number;
+  currency: string;
+  timestamp: string;
+  actor_user_id: string;
 }
 
 export interface DBEventStock {

@@ -16,6 +16,7 @@ CREATE TABLE inventario (
   hogar_id TEXT NOT NULL,
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL,
+  min_stock INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT NOT NULL
 );
 
@@ -28,6 +29,19 @@ CREATE TABLE events_stock (
   timestamp TEXT NOT NULL,
   actor_user_id TEXT NOT NULL
 );
+
+CREATE TABLE historial_precios (
+  id TEXT PRIMARY KEY,
+  hogar_id TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  price REAL NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'UYU',
+  timestamp TEXT NOT NULL,
+  actor_user_id TEXT NOT NULL,
+  FOREIGN KEY (hogar_id) REFERENCES hogares(id)
+);
+
+CREATE INDEX idx_historial_precios_hogar ON historial_precios(hogar_id, product_name);
 
 CREATE TABLE auditoria_legal (
   id TEXT PRIMARY KEY,
