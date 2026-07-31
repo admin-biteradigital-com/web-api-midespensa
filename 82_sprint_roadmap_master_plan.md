@@ -2,7 +2,7 @@
 
 Este documento formaliza la trazabilidad histórica, el estado actual y la hoja de ruta (**Roadmap Maestro**) de la plataforma **Mi Despensa**, alineando los requerimientos de arquitectura, calidad de código y las metas de experiencia de usuario (**UI/UX**) bajo la gobernanza de **Bitera Digital SAS**.
 
-> **Última actualización:** 2026-07-31 — Sprint 4 Analytics completado. Sprint 5 planificado.
+> **Última actualización:** 2026-07-31 — Sprint 5 completado + 4 bugfixes correctivos. Sprint 6 planificado.
 
 ---
 
@@ -20,7 +20,9 @@ Este documento formaliza la trazabilidad histórica, el estado actual y la hoja 
 | **Sprint 3 (Epic 2)** | Categorización Visual y Organización por Pasillo (D1 & PWA) | **✅ Completado** | Pass | Columna `category` en D1 remota (migración), Pills de filtro por pasillo, Badge de categoría |
 | **Sprint 3 (Epic 1)** | Escáner de Códigos de Barra en PWA (`UI/UX Barcode Scanner`) | **✅ Completado** | Pass | `barcode.js` BarcodeDetector API, Modal Viewfinder, Fallback elegante para browsers sin soporte |
 | **Sprint 4 (Analytics)** | Reportes de Consumo Doméstico + Exportación CSV | **✅ Completado** | Pass | `analytics.js` Canvas bar chart, Top Productos ranking, Resumen por categoría, CSV con BOM, Nav tabs Inventario/Reportes, KPI Valor Stock |
-| **Sprint 5 (Próximo)** | Notificaciones Push de Stock Bajo + Lista de Compras Inteligente | ⏳ **Planificado** | Pending | Web Push API, sugerencias basadas en historial de precios, agrupación por supermercado |
+| **Bugfixes Correctivos** | API_BASE URL, +/- debounce, Barcode camera selector, min_stock=0 | **✅ Completado** | Pass | `sync.js` URL fixed, debounce 800ms, `barcode.js` rewritten, form min=0 |
+| **Sprint 5** | Push Notifications VAPID + Lista de Compras Inteligente + Web Share | **✅ Completado** | Pass | `push.ts` VAPID endpoints, Cron diario D1, `push_subscriptions`, Lista por categoría con precios, checkbox restock, Web Share API |
+| **Sprint 6 (Próximo)** | Motor Predictivo de Agotamiento + Imágenes de Productos (R2) | ⏳ **Planificado** | Pending | Modelo de predicción por historial de consumo, Cloudflare R2 para imágenes |
 
 ---
 
@@ -33,8 +35,9 @@ graph TD
     S2 --> S25[Sprint 2.5: UI/UX Live Search, Tabs & KPI Metrics]
     S25 --> S3[Sprint 3: Escáner Barcode PWA & Categorización Visual]
     S3 --> S4[Sprint 4: Analytics de Consumo & Reportes CSV]
-    S4 --> S5[Sprint 5: Notificaciones Push & Lista de Compras Inteligente]
-    S5 --> S6[Sprint 6+: Comparador de Precios & Social Features]
+    S4 --> BF[Bugfixes Correctivos: API URL, Debounce, Camera, min_stock]
+    BF --> S5[Sprint 5: Push Notifications VAPID & Lista de Compras]
+    S5 --> S6[Sprint 6: Motor Predictivo & Imágenes R2]
 ```
 
 ---
@@ -97,6 +100,8 @@ Convertir Mi Despensa en una herramienta **proactiva**: que le avise al usuario 
 | **Arquitectura** | 0 violaciones `check-architecture.js` | ✅ |
 | **TypeScript** | 0 errores `tsc` | ✅ |
 | **Sync Badge** | Sin error en producción | ✅ (D1 migrada) |
+| **API URL** | workers.dev correctamente configurado | ✅ (bugfix) |
+| **Cron Trigger** | Activo `0 11 * * *` en producción | ✅ |
 
 ---
 
@@ -108,6 +113,8 @@ Convertir Mi Despensa en una herramienta **proactiva**: que le avise al usuario 
 | `59cd372` | feat(sprint-3-epic-1): Barcode Scanner PWA + BarcodeDetector API |
 | `b6a5b74` | feat(sprint-3-epic-2): Categorización visual + D1 category column |
 | `6e79ed3` | feat(sprint-4): Analytics Canvas, CSV Export, nav tabs, KPI |
+| `22cd349` | docs(sprint-4): Roadmap + backlog + informe de ejecución Sprint 4 |
+| `8f1ea40` | feat(sprint-5): Push VAPID, Lista Compras, 4 bugfixes, cron diario |
 
 ---
 
