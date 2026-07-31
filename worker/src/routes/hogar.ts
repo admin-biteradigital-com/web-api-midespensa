@@ -134,3 +134,77 @@ export async function handleGetHogar(
     });
   }
 }
+
+export async function handleJoinHogar(
+  request: Request,
+  env: { JWT_SECRET: string },
+  queryGate: D1QueryGate,
+  userSession: JWTPayload,
+  auditProvider: AuditEvidenceProvider
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  try {
+    const { hogarId } = (await request.json()) as { hogarId: string };
+    if (!hogarId || hogarId.trim() === "") {
+      return new Response(JSON.stringify({ error: "Missing household ID (Invite Code)" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const targetHogarId = hogarId.trim();
+
+    // Verificar que el hogar exista en la base de datos
+    const targetHogar = await queryGate.executeSystemFirst<DBHogar>(
+      "SELECT id, name, owner_id FROM hogares WHERE id = ?",
+      [targetHogarId]
+    );
+
+    if (!targetHogar) {
+      return new Response(
+        JSON.stringify({ error: "Código de hogar no encontrado o inválido" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Registrar evento HOGAR_JOIN
+    await auditProvider.recordEvent(
+      userSession.userId,
+      "HOGAR_JOIN",
+      { targetHogarId, targetHogarName: targetHogar.name },
+      targetHogarId
+    );
+
+    // Regenerar el token de sesión JWT asociando al usuario al hogar especificado
+    const newSessionToken = await createToken(
+      {
+        userId: userSession.userId,
+        email: userSession.email,
+        hogarId: targetHogarId,
+      },
+      env.JWT_SECRET
+    );
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        token: newSessionToken,
+        hogar: targetHogar,
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}

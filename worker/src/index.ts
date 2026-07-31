@@ -1,7 +1,7 @@
 import { authMiddleware } from "./middleware/auth";
 import { D1QueryGate } from "./middleware/tel";
 import { handleMagicLink, handleVerifyMagicLink } from "./routes/auth";
-import { handleCreateHogar, handleGetHogar } from "./routes/hogar";
+import { handleCreateHogar, handleGetHogar, handleJoinHogar } from "./routes/hogar";
 import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory, handleGetShoppingList } from "./routes/inventory";
 import { handleRecordPrice, handleGetPriceHistory } from "./routes/prices";
 import { handleGetEventsStock, handleRecordAuditLog } from "./routes/events";
@@ -86,6 +86,10 @@ export default {
         } else if (request.method === "GET") {
           return injectCors(await handleGetHogar(request, queryGate, userSession));
         }
+      }
+
+      if (path === API_ROUTES.HOGAR_JOIN && request.method === "POST") {
+        return injectCors(await handleJoinHogar(request, env, queryGate, userSession, auditProvider));
       }
 
       if (path === API_ROUTES.INVENTORY) {

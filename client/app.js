@@ -32,6 +32,9 @@ const ui = {
   viewDashboard:        document.getElementById("view-dashboard"),
   inputEmail:           document.getElementById("login-email"),
   inputHogarName:       document.getElementById("hogar-name"),
+  inputHogarJoinCode:   document.getElementById("hogar-join-code"),
+  btnJoinHogar:         document.getElementById("btn-join-hogar"),
+  btnShowInviteCode:    document.getElementById("btn-show-invite-code"),
   inputProductName:     document.getElementById("new-product-name"),
   inputProductQty:      document.getElementById("new-product-qty"),
   inputProductMin:      document.getElementById("new-product-min"),
@@ -276,6 +279,54 @@ ui.btnCreateHogar.addEventListener("click", async () => {
     ui.btnCreateHogar.textContent = "Crear Hogar";
   }
 });
+
+if (ui.btnJoinHogar) {
+  ui.btnJoinHogar.addEventListener("click", async () => {
+    const hogarId = ui.inputHogarJoinCode.value.trim();
+    if (!hogarId) {
+      showToast("Ingresa el código de invitación del hogar");
+      return;
+    }
+
+    ui.btnJoinHogar.disabled = true;
+    ui.btnJoinHogar.textContent = "Uniéndote...";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/hogar/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ hogarId }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const updatedUser = { ...user, hogarId: data.hogar.id };
+        SessionModule.initSession(data.token, updatedUser);
+        showToast(`Te has unido a "${data.hogar.name}"`);
+      } else {
+        showToast(data.error || "No se pudo unirse al hogar");
+      }
+    } catch (err) {
+      showToast("Error de conexión");
+      console.error(err);
+    } finally {
+      ui.btnJoinHogar.disabled = false;
+      ui.btnJoinHogar.textContent = "Unirme al Hogar";
+    }
+  });
+}
+
+if (ui.btnShowInviteCode) {
+  ui.btnShowInviteCode.addEventListener("click", () => {
+    if (!user || !user.hogarId) {
+      showToast("No tienes un hogar asignado");
+      return;
+    }
+    navigator.clipboard.writeText(user.hogarId)
+      .then(() => showToast("Código de invitación copiado al portapapeles"))
+      .catch(() => alert(`Tu código de invitación del hogar es:\n\n${user.hogarId}`));
+  });
+}
 
 // ============================================================================
 // DASHBOARD

@@ -95,26 +95,39 @@
       </div>
     </main>
 
-    <!-- Vista 2: Creación de Hogar (Configuración inicial) -->
+    <!-- Vista 2: Creación / Unión a Hogar (Configuración inicial) -->
     <main id="view-setup-hogar" class="view hidden">
       <h1 class="auth-title">Configurar Hogar</h1>
-      <p class="auth-desc">Crea un espacio compartido para coordinar la despensa con tu familia.</p>
+      <p class="auth-desc">Crea un espacio nuevo o únete al de tu familia con su Código de Invitación.</p>
       
-      <div class="glass-card">
+      <div class="glass-card" style="margin-bottom: 16px;">
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 10px;">Crear un nuevo Hogar</h3>
         <div class="form-group">
-          <label class="form-label" for="hogar-name">Nombre de tu hogar (ej. Casa Pérez o Nuestro Depto)</label>
-          <input type="text" id="hogar-name" placeholder="Casa López" required>
+          <label class="form-label" for="hogar-name">Nombre de tu hogar</label>
+          <input type="text" id="hogar-name" placeholder="Ej. Casa López" required>
         </div>
         <button id="btn-create-hogar">Crear Hogar</button>
+      </div>
+
+      <div class="glass-card">
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 10px;">Únete con un Código de Invitación</h3>
+        <div class="form-group">
+          <label class="form-label" for="hogar-join-code">Ingresa el Código de Invitación del Hogar</label>
+          <input type="text" id="hogar-join-code" placeholder="Ej. 123e4567-e89b-12d3-a456-426614174000" style="padding: 10px 12px;">
+        </div>
+        <button id="btn-join-hogar" class="btn-secondary" style="width: 100%;">Unirme al Hogar</button>
       </div>
     </main>
 
     <!-- Vista 3: Dashboard Principal (Inventario y Stock) -->
     <main id="view-dashboard" class="view hidden">
       
-      <div class="welcome-section">
-        <h2 class="welcome-title" id="dashboard-hogar-name">Mi Despensa</h2>
-        <span class="welcome-subtitle" id="dashboard-user-identity">Usuario: Anonimizado</span>
+      <div class="welcome-section" style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h2 class="welcome-title" id="dashboard-hogar-name">Mi Despensa</h2>
+          <span class="welcome-subtitle" id="dashboard-user-identity">Usuario: Anonimizado</span>
+        </div>
+        <button id="btn-show-invite-code" class="btn-secondary" style="font-size: 11px; padding: 6px 10px; box-shadow: none;">🔑 Código de Invitación</button>
       </div>
 
       <!-- Agregar nuevo producto -->

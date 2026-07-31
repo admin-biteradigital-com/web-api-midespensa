@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleMagicLink, handleVerifyMagicLink } from "../routes/auth";
-import { handleCreateHogar, handleGetHogar } from "../routes/hogar";
+import { handleCreateHogar, handleGetHogar, handleJoinHogar } from "../routes/hogar";
 import { handleInventoryAdd, handleInventoryRemove, handleGetInventory } from "../routes/inventory";
 import { handleRecordAuditLog, handleGetEventsStock } from "../routes/events";
 import { D1QueryGate, TenantContext } from "../middleware/tel";
@@ -320,14 +320,53 @@ describe("Route Handlers Integration & Middlewares", () => {
       });
 
       const mockQueryGate = {
-        executeSystemFirst: vi.fn().mockResolvedValue({ id: "h-existing", name: "Hogar 1" }),
+        executeSystemFirst: vi.fn().mockResolvedValue({ id: "h1", name: "Hogar 1", owner_id: "user-123" }),
       } as any;
 
       const response = await handleCreateHogar(request, env, mockQueryGate, sessionUser, mockAuditProvider);
       expect(response.status).toBe(400);
     });
 
-    it("handleGetHogar debería retornar los detalles del hogar si existe", async () => {
+    it("handleJoinHogar debería unirse a un hogar existente y regenerar JWT", async () => {
+      const request = new Request("https://example.com/api/v1/hogar/join", {
+        method: "POST",
+        body: JSON.stringify({ hogarId: "hogar-invitado-999" }),
+      });
+
+      const mockQueryGate = {
+        executeSystemFirst: vi.fn().mockResolvedValue({ id: "hogar-invitado-999", name: "Hogar Familia Pérez", owner_id: "owner-789" }),
+      } as any;
+
+      const response = await handleJoinHogar(request, env, mockQueryGate, sessionUser, mockAuditProvider);
+      expect(response.status).toBe(200);
+
+      const json = await response.json() as any;
+      expect(json.success).toBe(true);
+      expect(json.token).toBeDefined();
+      expect(json.hogar.name).toBe("Hogar Familia Pérez");
+      expect(mockAuditProvider.recordEvent).toHaveBeenCalledWith(
+        "user-123",
+        "HOGAR_JOIN",
+        expect.objectContaining({ targetHogarId: "hogar-invitado-999" }),
+        "hogar-invitado-999"
+      );
+    });
+
+    it("handleJoinHogar debería retornar 404 si el código de hogar no existe", async () => {
+      const request = new Request("https://example.com/api/v1/hogar/join", {
+        method: "POST",
+        body: JSON.stringify({ hogarId: "hogar-inexistente" }),
+      });
+
+      const mockQueryGate = {
+        executeSystemFirst: vi.fn().mockResolvedValue(null),
+      } as any;
+
+      const response = await handleJoinHogar(request, env, mockQueryGate, sessionUser, mockAuditProvider);
+      expect(response.status).toBe(404);
+    });
+
+    it("handleGetHogar debería retornar el hogar si el usuario está asociado", async () => {
       const request = new Request("https://example.com/api/v1/hogar", { method: "GET" });
       const userWithHogar: JWTPayload = { ...sessionUser, hogarId: "hogar-123" };
 
