@@ -48,6 +48,7 @@ async function saveInventoryLocal(items) {
         product_name: item.product_name,
         quantity: item.quantity,
         min_stock: item.min_stock !== undefined ? item.min_stock : 1,
+        category: item.category || "Almacén",
         updated_at: item.updated_at
       });
     });
@@ -69,7 +70,7 @@ async function getOfflineEvents() {
   });
 }
 
-async function enqueueOfflineEvent(productName, eventType, quantityDelta, minStock = 1) {
+async function enqueueOfflineEvent(productName, eventType, quantityDelta, minStock = 1, category = "Almacén") {
   const db = await openDB();
   const timestamp = new Date().toISOString();
   
@@ -82,6 +83,7 @@ async function enqueueOfflineEvent(productName, eventType, quantityDelta, minSto
       event_type: eventType,
       quantity_delta: quantityDelta,
       min_stock: minStock,
+      category: category,
       timestamp: timestamp
     });
     request.onsuccess = () => resolve();
@@ -103,6 +105,7 @@ async function enqueueOfflineEvent(productName, eventType, quantityDelta, minSto
         } else {
           existing.quantity = newQty;
           existing.min_stock = minStock !== undefined ? minStock : existing.min_stock;
+          existing.category = category || existing.category || "Almacén";
           existing.updated_at = timestamp;
           store.put(existing);
         }
@@ -111,6 +114,7 @@ async function enqueueOfflineEvent(productName, eventType, quantityDelta, minSto
           product_name: productName,
           quantity: quantityDelta,
           min_stock: minStock,
+          category: category,
           updated_at: timestamp
         });
       }

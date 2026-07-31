@@ -17,6 +17,7 @@ CREATE TABLE inventario (
   product_name TEXT NOT NULL,
   quantity INTEGER NOT NULL,
   min_stock INTEGER NOT NULL DEFAULT 1,
+  category TEXT NOT NULL DEFAULT 'Almacén',
   updated_at TEXT NOT NULL
 );
 

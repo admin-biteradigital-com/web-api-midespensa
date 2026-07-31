@@ -27,7 +27,7 @@ export async function handleGetInventory(
     const tenantCtx = new TenantContext(hogarId);
     const items = await queryGate.executeTenantQuery<DBInventario>(
       tenantCtx,
-      "SELECT id, hogar_id, product_name, quantity, updated_at FROM inventario WHERE hogar_id = ? ORDER BY product_name ASC",
+      "SELECT id, hogar_id, product_name, quantity, min_stock, category, updated_at FROM inventario WHERE hogar_id = ? ORDER BY product_name ASC",
       [hogarId]
     );
 
@@ -64,9 +64,10 @@ export async function handleInventoryAdd(
   }
 
   try {
-    const { product_name, quantity_delta } = (await request.json()) as {
+    const { product_name, quantity_delta, category } = (await request.json()) as {
       product_name: string;
       quantity_delta: number;
+      category?: string;
     };
 
     if (!product_name || product_name.trim() === "" || typeof quantity_delta !== "number" || quantity_delta <= 0) {
@@ -80,13 +81,14 @@ export async function handleInventoryAdd(
     }
 
     const nameNormalized = product_name.trim();
+    const catNormalized = (category && category.trim()) ? category.trim() : "Almacén";
     const tenantCtx = new TenantContext(hogarId);
     const timestamp = new Date().toISOString();
 
     // 1. Consultar si ya existe el producto en el inventario de este hogar
     const existing = await queryGate.executeTenantFirst<DBInventario>(
       tenantCtx,
-      "SELECT id, hogar_id, product_name, quantity, updated_at FROM inventario WHERE hogar_id = ? AND product_name = ?",
+      "SELECT id, hogar_id, product_name, quantity, min_stock, category, updated_at FROM inventario WHERE hogar_id = ? AND product_name = ?",
       [hogarId, nameNormalized]
     );
 
@@ -98,13 +100,13 @@ export async function handleInventoryAdd(
       const newQty = existing.quantity + quantity_delta;
       
       inventarioStmt = queryGate.prepare(
-        "UPDATE inventario SET quantity = ?, updated_at = ? WHERE id = ? AND hogar_id = ?"
-      ).bind(newQty, timestamp, productId, hogarId);
+        "UPDATE inventario SET quantity = ?, category = ?, updated_at = ? WHERE id = ? AND hogar_id = ?"
+      ).bind(newQty, catNormalized, timestamp, productId, hogarId);
     } else {
       productId = crypto.randomUUID();
       inventarioStmt = queryGate.prepare(
-        "INSERT INTO inventario (id, hogar_id, product_name, quantity, updated_at) VALUES (?, ?, ?, ?, ?)"
-      ).bind(productId, hogarId, nameNormalized, quantity_delta, timestamp);
+        "INSERT INTO inventario (id, hogar_id, product_name, quantity, category, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(productId, hogarId, nameNormalized, quantity_delta, catNormalized, timestamp);
     }
 
     // 2. Preparar el log de eventos (events_stock) - append-only

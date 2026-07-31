@@ -160,6 +160,19 @@
               <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Precio</label>
               <input type="number" id="new-product-price" step="0.5" placeholder="Opcional" style="width: 100%; padding: 8px 10px;">
             </div>
+            <div style="width: 110px;">
+              <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Categoría</label>
+              <select id="new-product-category" style="width: 100%; padding: 8px 6px; font-size: 12px; background: rgba(0, 0, 0, 0.3); color: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                <option value="Almacén" selected>📦 Almacén</option>
+                <option value="Lácteos">🥛 Lácteos</option>
+                <option value="Limpieza">🧹 Limpieza</option>
+                <option value="Bebidas">🥤 Bebidas</option>
+                <option value="Frescos">🍎 Frescos</option>
+                <option value="Congelados">❄️ Congelados</option>
+                <option value="Mascotas">🐾 Mascotas</option>
+                <option value="Higiene">🧴 Higiene</option>
+              </select>
+            </div>
             <div style="width: 80px;">
               <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Moneda</label>
               <select id="new-product-currency" style="width: 100%; padding: 8px 6px; font-size: 12px; background: rgba(0, 0, 0, 0.3); color: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
@@ -191,6 +204,16 @@
           </div>
           <button id="btn-refresh-manual" class="btn-secondary" style="padding: 6px 12px; font-size: 11px; box-shadow: none;">Actualizar</button>
         </h3>
+        <div style="margin-bottom: 8px; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;" id="category-pills-container">
+          <button class="cat-pill active" data-cat="ALL" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--primary); background: var(--primary); color: #fff; border-radius: 12px; cursor: pointer; white-space: nowrap;">Todas</button>
+          <button class="cat-pill" data-cat="Almacén" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">📦 Almacén</button>
+          <button class="cat-pill" data-cat="Lácteos" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">🥛 Lácteos</button>
+          <button class="cat-pill" data-cat="Limpieza" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">🧹 Limpieza</button>
+          <button class="cat-pill" data-cat="Bebidas" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">🥤 Bebidas</button>
+          <button class="cat-pill" data-cat="Frescos" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">🍎 Frescos</button>
+          <button class="cat-pill" data-cat="Congelados" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">❄️ Congelados</button>
+          <button class="cat-pill" data-cat="Higiene" style="padding: 4px 10px; font-size: 11px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-muted); border-radius: 12px; cursor: pointer; white-space: nowrap;">🧴 Higiene</button>
+        </div>
         <div style="margin-bottom: 12px;">
           <input type="text" id="input-search-inventory" placeholder="🔍 Buscar producto..." style="width: 100%; padding: 8px 12px; font-size: 12px; border-radius: var(--radius-sm);">
         </div>

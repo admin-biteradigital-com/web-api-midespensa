@@ -39,6 +39,7 @@ const ui = {
   inputProductQty:      document.getElementById("new-product-qty"),
   inputProductMin:      document.getElementById("new-product-min"),
   inputProductPrice:    document.getElementById("new-product-price"),
+  inputProductCategory: document.getElementById("new-product-category"),
   inputProductCurrency: document.getElementById("new-product-currency"),
   tabFilterAll:         document.getElementById("tab-filter-all"),
   tabFilterLow:         document.getElementById("tab-filter-low"),
@@ -392,6 +393,7 @@ async function loadEventLogs() {
 
 let activeTab = "ALL"; // "ALL" | "LOW"
 let searchQuery = "";
+let selectedCategory = "ALL";
 
 // Render dynamic stock cards
 function renderInventoryList(items) {
@@ -412,15 +414,21 @@ function renderInventoryList(items) {
     const matchesQuery = searchQuery
       ? item.product_name.toLowerCase().includes(searchQuery.toLowerCase())
       : true;
-    return matchesTab && matchesQuery;
+    const matchesCat = selectedCategory === "ALL"
+      ? true
+      : (item.category || "Almacén") === selectedCategory;
+
+    return matchesTab && matchesQuery && matchesCat;
   });
 
   if (filteredItems.length === 0) {
     const emptyMsg = searchQuery
       ? `No se encontraron productos que coincidan con "${searchQuery}".`
-      : (activeTab === "LOW"
-          ? "¡Excelente! No tienes productos pendientes por recomprar."
-          : "Tu alacena está vacía. ¡Agrega tu primer artículo!");
+      : (selectedCategory !== "ALL"
+          ? `No hay productos en la categoría "${selectedCategory}".`
+          : (activeTab === "LOW"
+              ? "¡Excelente! No tienes productos pendientes por recomprar."
+              : "Tu alacena está vacía. ¡Agrega tu primer artículo!"));
     ui.inventoryContainer.innerHTML = `
       <div class="empty-state">
         <svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.1 1.7 3.8 3.8 4v7.1c0 .5.4.9.9.9h2.6c.5 0 .9-.4.9-.9V13c2.1-.2 3.8-1.9 3.8-4V2h-2v7zm8-3h-2V2h-2v4h-2V2h-2v4c0 2.2 1.8 4 4 4v9.1c0 .5.4.9.9.9h.2c.5 0 .9-.4.9-.9V10c2.2 0 4-1.8 4-4V2h-2v4z"/></svg>
@@ -440,6 +448,16 @@ function renderInventoryList(items) {
     const name = document.createElement("span");
     name.className = "product-name";
     name.textContent = item.product_name;
+
+    const catBadge = document.createElement("span");
+    catBadge.style.fontSize = "10px";
+    catBadge.style.padding = "2px 6px";
+    catBadge.style.borderRadius = "10px";
+    catBadge.style.background = "rgba(124, 58, 237, 0.15)";
+    catBadge.style.color = "var(--primary-hover)";
+    catBadge.style.marginLeft = "6px";
+    catBadge.textContent = item.category || "Almacén";
+    name.appendChild(catBadge);
 
     const minStock = item.min_stock !== undefined ? item.min_stock : 1;
     if (item.quantity <= minStock) {
@@ -497,7 +515,7 @@ function renderInventoryList(items) {
 // STOCK MANAGEMENT
 // ============================================================================
 
-async function handleUpdateQuantity(productName, eventType, delta, minStock = 1) {
+async function handleUpdateQuantity(productName, eventType, delta, minStock = 1, category = "Almacén") {
   if (eventType === "REMOVE") {
     const currentList = await getInventoryLocal();
     const item = currentList.find(i => i.product_name === productName);
@@ -506,9 +524,10 @@ async function handleUpdateQuantity(productName, eventType, delta, minStock = 1)
       return;
     }
     minStock = item.min_stock !== undefined ? item.min_stock : 1;
+    category = item.category || "Almacén";
   }
 
-  await enqueueOfflineEvent(productName, eventType, delta, minStock);
+  await enqueueOfflineEvent(productName, eventType, delta, minStock, category);
   const localInventory = await getInventoryLocal();
   renderInventoryList(localInventory);
   triggerSync();
@@ -519,10 +538,11 @@ ui.btnCreateProduct.addEventListener("click", async () => {
   const qty = parseInt(ui.inputProductQty ? ui.inputProductQty.value : "1", 10) || 1;
   const minStock = parseInt(ui.inputProductMin ? ui.inputProductMin.value : "1", 10) || 1;
   const priceVal = parseFloat(ui.inputProductPrice ? ui.inputProductPrice.value : "");
+  const categoryVal = ui.inputProductCategory ? ui.inputProductCategory.value : "Almacén";
   const currencyVal = ui.inputProductCurrency ? ui.inputProductCurrency.value : "UYU";
 
   if (!name) { showToast("Ingresa el nombre del producto"); return; }
-  handleUpdateQuantity(name, "ADD", qty, minStock);
+  handleUpdateQuantity(name, "ADD", qty, minStock, categoryVal);
 
   if (!isNaN(priceVal) && priceVal > 0 && token) {
     try {
@@ -564,6 +584,26 @@ async function triggerSync() {
   }
 
   isSyncing = false;
+}
+
+const catPills = document.querySelectorAll(".cat-pill");
+if (catPills.length > 0) {
+  catPills.forEach(pill => {
+    pill.addEventListener("click", async () => {
+      catPills.forEach(p => {
+        p.style.background = "rgba(0,0,0,0.2)";
+        p.style.color = "var(--text-muted)";
+        p.style.borderColor = "var(--border-color)";
+      });
+      pill.style.background = "var(--primary)";
+      pill.style.color = "#fff";
+      pill.style.borderColor = "var(--primary)";
+
+      selectedCategory = pill.getAttribute("data-cat") || "ALL";
+      const items = await getInventoryLocal();
+      renderInventoryList(items);
+    });
+  });
 }
 
 if (ui.inputSearchInventory) {

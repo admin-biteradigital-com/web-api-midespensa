@@ -17,6 +17,7 @@ export interface DBInventario {
   product_name: string;
   quantity: number;
   min_stock?: number;
+  category?: string;
   updated_at: string;
 }
 
