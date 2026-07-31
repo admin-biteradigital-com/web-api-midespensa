@@ -2,7 +2,7 @@ const API_BASE =
   window.location.origin.includes("localhost") ||
   window.location.origin.includes("127.0.0.1")
     ? "http://localhost:8787"
-    : "https://midespensa.biteradigital.com";
+    : "https://web-api-midespensa.administracion-698.workers.dev";
 
 async function pullInventory(token) {
   const response = await fetch(`${API_BASE}/api/v1/inventory`, {

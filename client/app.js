@@ -66,9 +66,15 @@ const ui = {
   btnLogoutReportes:    document.getElementById("btn-logout-reportes"),
   btnExportCsv:         document.getElementById("btn-export-csv"),
   tabNavInventario:     document.getElementById("tab-nav-inventario"),
+  tabNavLista:          document.getElementById("tab-nav-lista"),
   tabNavReportes:       document.getElementById("tab-nav-reportes"),
   panelInventario:      document.getElementById("panel-inventario"),
+  panelLista:           document.getElementById("panel-lista"),
   panelReportes:        document.getElementById("panel-reportes"),
+  listaContainer:       document.getElementById("lista-container"),
+  listaSummary:         document.getElementById("lista-summary"),
+  btnShareLista:        document.getElementById("btn-share-lista"),
+  btnRefreshLista:      document.getElementById("btn-refresh-lista"),
   metricStockValue:     document.getElementById("metric-stock-value"),
 };
 
@@ -532,28 +538,48 @@ function renderInventoryList(items) {
 // STOCK MANAGEMENT
 // ============================================================================
 
-async function handleUpdateQuantity(productName, eventType, delta, minStock = 1, category = "Almacén") {
-  if (eventType === "REMOVE") {
-    const currentList = await getInventoryLocal();
-    const item = currentList.find(i => i.product_name === productName);
+// Debounced sync timer — prevents per-click DB writes
+let _syncDebounceTimer = null;
+function scheduleSyncAfterIdle() {
+  if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+  _syncDebounceTimer = setTimeout(() => {
+    _syncDebounceTimer = null;
+    triggerSync();
+  }, 800);
+}
+
+async function handleUpdateQuantity(productName, eventType, delta, minStock, category) {
+  // Read current state from local IndexedDB
+  const currentList = await getInventoryLocal();
+  const item = currentList.find(i => i.product_name === productName);
+
+  // Resolve defaults from item if not provided
+  const resolvedMin = (minStock !== undefined && minStock !== null) ? minStock : (item ? (item.min_stock ?? 0) : 0);
+  const resolvedCat = category || (item ? (item.category || 'Almacén') : 'Almacén');
+
+  if (eventType === 'REMOVE') {
     if (!item || item.quantity - delta < 0) {
-      showToast("La cantidad no puede ser menor a cero");
+      showToast('La cantidad no puede ser menor a cero');
       return;
     }
-    minStock = item.min_stock !== undefined ? item.min_stock : 1;
-    category = item.category || "Almacén";
   }
 
-  await enqueueOfflineEvent(productName, eventType, delta, minStock, category);
-  const localInventory = await getInventoryLocal();
-  renderInventoryList(localInventory);
-  triggerSync();
+  // Enqueue the event (writes to IndexedDB Outbox + optimistic local update)
+  await enqueueOfflineEvent(productName, eventType, delta, resolvedMin, resolvedCat);
+
+  // Re-render immediately from local state (no flicker, no DB round-trip)
+  const updatedList = await getInventoryLocal();
+  renderInventoryList(updatedList);
+
+  // Schedule a single batched sync after idle (800ms after last click)
+  scheduleSyncAfterIdle();
 }
 
 ui.btnCreateProduct.addEventListener("click", async () => {
   const name = ui.inputProductName.value.trim();
   const qty = parseInt(ui.inputProductQty ? ui.inputProductQty.value : "1", 10) || 1;
-  const minStock = parseInt(ui.inputProductMin ? ui.inputProductMin.value : "1", 10) || 1;
+  const minStockRaw = ui.inputProductMin ? ui.inputProductMin.value : "0";
+  const minStock = Math.max(0, parseInt(minStockRaw, 10) || 0);
   const priceVal = parseFloat(ui.inputProductPrice ? ui.inputProductPrice.value : "");
   const categoryVal = ui.inputProductCategory ? ui.inputProductCategory.value : "Almacén";
   const currencyVal = ui.inputProductCurrency ? ui.inputProductCurrency.value : "UYU";
@@ -637,40 +663,242 @@ if (ui.btnClosePriceModal && ui.modalPriceHistory) {
   });
 }
 
-// ── Navigation: Inventario / Reportes ────────────────────────────────────────
+// ── Navigation: Inventario / Lista / Reportes ─────────────────────────────
 let cachedPriceHistory = [];
+
+/** Set active tab button styles across all 3 tabs */
+function setActiveTab(activeId) {
+  const tabs = [ui.tabNavInventario, ui.tabNavLista, ui.tabNavReportes];
+  tabs.forEach(btn => {
+    if (!btn) return;
+    btn.style.background = "transparent";
+    btn.style.color      = "var(--text-muted)";
+  });
+  const active = { "inventario": ui.tabNavInventario, "lista": ui.tabNavLista, "reportes": ui.tabNavReportes }[activeId];
+  if (active) { active.style.background = "var(--primary)"; active.style.color = "#fff"; }
+}
 
 function showInventarioPanel() {
   if (ui.panelInventario) ui.panelInventario.style.display = "";
+  if (ui.panelLista)      ui.panelLista.style.display      = "none";
   if (ui.panelReportes)   ui.panelReportes.style.display   = "none";
-  if (ui.tabNavInventario) {
-    ui.tabNavInventario.style.background = "var(--primary)";
-    ui.tabNavInventario.style.color      = "#fff";
-  }
-  if (ui.tabNavReportes) {
-    ui.tabNavReportes.style.background = "transparent";
-    ui.tabNavReportes.style.color      = "var(--text-muted)";
-  }
+  setActiveTab("inventario");
+}
+
+async function showListaPanel() {
+  if (ui.panelInventario) ui.panelInventario.style.display = "none";
+  if (ui.panelLista)      ui.panelLista.style.display      = "flex";
+  if (ui.panelReportes)   ui.panelReportes.style.display   = "none";
+  setActiveTab("lista");
+  await renderShoppingList();
 }
 
 async function showReportesPanel() {
   if (ui.panelInventario) ui.panelInventario.style.display = "none";
+  if (ui.panelLista)      ui.panelLista.style.display      = "none";
   if (ui.panelReportes)   ui.panelReportes.style.display   = "flex";
-  if (ui.tabNavReportes) {
-    ui.tabNavReportes.style.background = "var(--primary)";
-    ui.tabNavReportes.style.color      = "#fff";
-  }
-  if (ui.tabNavInventario) {
-    ui.tabNavInventario.style.background = "transparent";
-    ui.tabNavInventario.style.color      = "var(--text-muted)";
-  }
+  setActiveTab("reportes");
   if (typeof window.renderReports === "function") {
     await window.renderReports(allInventoryItems, cachedPriceHistory);
   }
 }
 
 if (ui.tabNavInventario) ui.tabNavInventario.addEventListener("click", showInventarioPanel);
+if (ui.tabNavLista)      ui.tabNavLista.addEventListener("click", showListaPanel);
 if (ui.tabNavReportes)   ui.tabNavReportes.addEventListener("click", showReportesPanel);
+
+// ── Shopping List: Render ────────────────────────────────────────────────
+async function renderShoppingList() {
+  if (!ui.listaContainer) return;
+  ui.listaContainer.innerHTML = `<div style="text-align:center;padding:32px 0;color:var(--text-muted);font-size:13px;">Cargando lista de compras...</div>`;
+  if (ui.listaSummary) ui.listaSummary.textContent = "Cargando...";
+
+  let items = [];
+  try {
+    if (token) {
+      const res = await fetch(`${API_BASE}/api/v1/shopping-list`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        items = data.shopping_list || [];
+      }
+    } else {
+      // Offline fallback: use local cache and filter by min_stock
+      const all = await getInventoryLocal();
+      items = all.filter(i => i.quantity <= (i.min_stock ?? 0));
+    }
+  } catch (e) {
+    // Network error: use local cache
+    const all = await getInventoryLocal();
+    items = all.filter(i => i.quantity <= (i.min_stock ?? 0));
+  }
+
+  if (items.length === 0) {
+    ui.listaContainer.innerHTML = `
+      <div class="glass-card" style="text-align:center; padding: 32px 16px; gap: 12px;">
+        <div style="font-size: 36px;">🎉</div>
+        <div style="font-weight: 600; color: var(--accent-green);">¡Todo en orden!</div>
+        <div style="font-size: 13px; color: var(--text-muted);">No hay productos que necesiten reposición.</div>
+      </div>`;
+    if (ui.listaSummary) ui.listaSummary.textContent = "Nada que reponer — stock completo";
+    return;
+  }
+
+  // Group by category
+  const byCategory = {};
+  items.forEach(item => {
+    const cat = item.category || "Almacén";
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(item);
+  });
+
+  if (ui.listaSummary) {
+    ui.listaSummary.textContent = `${items.length} producto${items.length !== 1 ? "s" : ""} para reponer`;
+  }
+
+  ui.listaContainer.innerHTML = "";
+
+  const CATEGORY_EMOJI = {
+    "Almacén": "🥫", "Lácteos": "🥛", "Limpieza": "🧹", "Bebidas": "🥤",
+    "Frescos": "🥑", "Congelados": "🧊", "Mascotas": "🐾", "Higiene": "🧴"
+  };
+
+  Object.entries(byCategory).forEach(([cat, catItems]) => {
+    const section = document.createElement("div");
+    section.className = "glass-card";
+    section.style.padding = "12px 14px";
+    section.style.gap = "10px";
+
+    // Category header
+    const catHeader = document.createElement("div");
+    catHeader.style.cssText = "display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:13px;font-weight:700;";
+    catHeader.textContent = `${CATEGORY_EMOJI[cat] || "📦"} ${cat}`;
+    section.appendChild(catHeader);
+
+    catItems.forEach(item => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);";
+      row.dataset.productId = item.id;
+
+      // Checkbox
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.id = `lista-cb-${item.id}`;
+      cb.style.cssText = "width:18px;height:18px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;";
+      cb.addEventListener("change", () => handleListaRestock(item, cb, row));
+
+      // Product info
+      const info = document.createElement("div");
+      info.style.cssText = "flex:1;min-width:0;";
+
+      const name = document.createElement("div");
+      name.style.cssText = "font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+      name.textContent = item.product_name;
+
+      const meta = document.createElement("div");
+      meta.style.cssText = "display:flex;gap:6px;margin-top:3px;align-items:center;flex-wrap:wrap;";
+
+      // Deficit badge
+      const deficit = (item.min_stock ?? 0) - item.quantity + 1;
+      const defBadge = document.createElement("span");
+      defBadge.style.cssText = "font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(239,68,68,0.15);color:var(--accent-red);font-weight:600;";
+      defBadge.textContent = `Necesitas +${deficit}`;
+
+      meta.appendChild(defBadge);
+
+      // Price chip if available
+      if (item.last_price) {
+        const priceChip = document.createElement("span");
+        priceChip.style.cssText = "font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(16,185,129,0.1);color:var(--accent-green);font-weight:500;";
+        priceChip.textContent = `${item.last_currency || "UYU"} $${Number(item.last_price).toFixed(2)}`;
+        meta.appendChild(priceChip);
+      }
+
+      info.appendChild(name);
+      info.appendChild(meta);
+
+      row.appendChild(cb);
+      row.appendChild(info);
+      section.appendChild(row);
+    });
+
+    ui.listaContainer.appendChild(section);
+  });
+}
+
+// ── Shopping List: Restock on checkbox ────────────────────────────────────
+async function handleListaRestock(item, checkbox, rowEl) {
+  checkbox.disabled = true;
+  rowEl.style.opacity = "0.5";
+
+  try {
+    if (token) {
+      await fetch(`${API_BASE}/api/v1/shopping-list/restock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ product_id: item.id }),
+      });
+    } else {
+      // Offline: enqueue restock event locally
+      const deficit = (item.min_stock ?? 0) - item.quantity + 1;
+      await enqueueOfflineEvent(item.product_name, "ADD", deficit, item.min_stock ?? 0, item.category || "Almacén");
+    }
+
+    // Optimistic remove with fade
+    rowEl.style.transition = "opacity 0.3s";
+    rowEl.style.opacity = "0";
+    setTimeout(() => {
+      rowEl.remove();
+      // Re-check if section is empty
+      const section = rowEl.closest(".glass-card");
+      if (section && section.querySelectorAll("[data-product-id]").length === 0) {
+        section.remove();
+      }
+      // Refresh count badge
+      const remaining = ui.listaContainer ? ui.listaContainer.querySelectorAll("[data-product-id]").length : 0;
+      if (ui.listaSummary) {
+        ui.listaSummary.textContent = remaining > 0
+          ? `${remaining} producto${remaining !== 1 ? "s" : ""} para reponer`
+          : "Nada que reponer — stock completo";
+      }
+    }, 300);
+
+    showToast(`✅ ${item.product_name} marcado como comprado`);
+    scheduleSyncAfterIdle();
+  } catch (e) {
+    checkbox.disabled = false;
+    rowEl.style.opacity = "1";
+    showToast("Error al marcar como comprado");
+  }
+}
+
+// ── Web Share / clipboard ─────────────────────────────────────────────────
+async function shareShoppingList() {
+  const items = Array.from(ui.listaContainer ? ui.listaContainer.querySelectorAll("[data-product-id]") : []);
+  if (items.length === 0) { showToast("La lista está vacía"); return; }
+
+  const rows = items.map(row => {
+    const nameEl = row.querySelector("div > div:first-child");
+    const defEl  = row.querySelector("span");
+    return `• ${nameEl ? nameEl.textContent.trim() : "?"} ${defEl ? "(" + defEl.textContent.trim() + ")" : ""}`;
+  });
+  const text = `🛒 Mi Lista de Compras\n\n${rows.join("\n")}\n\nGenerado con Mi Despensa`;
+
+  if (navigator.share) {
+    try { await navigator.share({ title: "Mi Lista de Compras", text }); return; } catch (e) { /* user cancelled */ }
+  }
+  // Clipboard fallback
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("📋 Lista copiada al portapapeles");
+  } catch {
+    showToast("No se pudo compartir la lista");
+  }
+}
+
+if (ui.btnShareLista)   ui.btnShareLista.addEventListener("click", shareShoppingList);
+if (ui.btnRefreshLista) ui.btnRefreshLista.addEventListener("click", renderShoppingList);
 
 if (ui.btnExportCsv) {
   ui.btnExportCsv.addEventListener("click", async () => {

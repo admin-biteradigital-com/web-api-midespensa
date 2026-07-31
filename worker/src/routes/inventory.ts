@@ -375,18 +375,26 @@ export async function handleGetShoppingList(
   if (!hogarId) {
     return new Response(
       JSON.stringify({ error: "User is not associated with any household" }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      }
+      { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
 
   try {
     const tenantCtx = new TenantContext(hogarId);
-    const shoppingItems = await queryGate.executeTenantQuery<DBInventario>(
+    // Enrich with last recorded price per product via correlated subquery
+    const shoppingItems = await queryGate.executeTenantQuery<DBInventario & { last_price?: number; last_currency?: string }>(
       tenantCtx,
-      "SELECT id, hogar_id, product_name, quantity, min_stock, updated_at FROM inventario WHERE hogar_id = ? AND quantity <= min_stock ORDER BY product_name ASC",
+      `SELECT
+         i.id, i.hogar_id, i.product_name, i.quantity, i.min_stock, i.category, i.updated_at,
+         (SELECT hp.price FROM historial_precios hp
+          WHERE hp.hogar_id = i.hogar_id AND hp.product_name = i.product_name
+          ORDER BY hp.timestamp DESC LIMIT 1) AS last_price,
+         (SELECT hp.currency FROM historial_precios hp
+          WHERE hp.hogar_id = i.hogar_id AND hp.product_name = i.product_name
+          ORDER BY hp.timestamp DESC LIMIT 1) AS last_currency
+       FROM inventario i
+       WHERE i.hogar_id = ? AND i.quantity <= i.min_stock
+       ORDER BY i.category ASC, i.product_name ASC`,
       [hogarId]
     );
 
@@ -398,5 +406,100 @@ export async function handleGetShoppingList(
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
+  }
+}
+
+// ── POST /api/v1/shopping-list/restock ────────────────────────────────────
+// Marks a shopping list item as "purchased": increments quantity to min_stock + 1
+// Body: { product_id: string, quantity_added?: number }
+export async function handleRestockItem(
+  request: Request,
+  queryGate: D1QueryGate,
+  userSession: JWTPayload,
+  auditProvider: AuditEvidenceProvider
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  const hogarId = userSession.hogarId;
+  if (!hogarId) {
+    return new Response(
+      JSON.stringify({ error: "User is not associated with any household" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  let body: { product_id: string; quantity_added?: number };
+  try {
+    body = await request.json() as { product_id: string; quantity_added?: number };
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Invalid JSON body" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  if (!body.product_id) {
+    return new Response(
+      JSON.stringify({ error: "product_id is required" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  const tenantCtx = new TenantContext(hogarId);
+  const now = new Date().toISOString();
+
+  try {
+    // Fetch current item to compute new quantity
+    const rows = await queryGate.executeTenantQuery<DBInventario>(
+      tenantCtx,
+      "SELECT id, product_name, quantity, min_stock FROM inventario WHERE id = ? AND hogar_id = ?",
+      [body.product_id, hogarId]
+    );
+
+    if (!rows || rows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Product not found in this hogar" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const item = rows[0];
+    const qtyAdded = body.quantity_added ?? ((item.min_stock ?? 0) + 1 - item.quantity);
+    const newQty = item.quantity + qtyAdded;
+
+    await queryGate.prepare(
+      "UPDATE inventario SET quantity = ?, updated_at = ? WHERE id = ? AND hogar_id = ?"
+    ).bind(newQty, now, body.product_id, hogarId).run();
+
+    // Record restock event
+    const eventId = crypto.randomUUID();
+    await queryGate.prepare(
+      `INSERT INTO events_stock (id, hogar_id, product_id, event_type, quantity_delta, timestamp, actor_user_id)
+       VALUES (?, ?, ?, 'RESTOCK', ?, ?, ?)`
+    ).bind(eventId, hogarId, body.product_id, qtyAdded, now, userSession.userId).run();
+
+    await auditProvider.recordEvent(
+      userSession.userId,
+      "RESTOCK_FROM_SHOPPING_LIST",
+      { product_id: body.product_id, product_name: item.product_name, qty_added: qtyAdded, new_qty: newQty },
+      hogarId
+    );
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        product_id: body.product_id,
+        product_name: item.product_name,
+        new_quantity: newQty,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err: any) {
+    return new Response(
+      JSON.stringify({ error: err.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 }

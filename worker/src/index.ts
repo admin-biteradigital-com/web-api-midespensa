@@ -2,9 +2,10 @@ import { authMiddleware } from "./middleware/auth";
 import { D1QueryGate } from "./middleware/tel";
 import { handleMagicLink, handleVerifyMagicLink } from "./routes/auth";
 import { handleCreateHogar, handleGetHogar, handleJoinHogar } from "./routes/hogar";
-import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory, handleGetShoppingList } from "./routes/inventory";
+import { handleGetInventory, handleInventoryAdd, handleInventoryRemove, handleRebuildInventory, handleGetShoppingList, handleRestockItem } from "./routes/inventory";
 import { handleRecordPrice, handleGetPriceHistory } from "./routes/prices";
 import { handleGetEventsStock, handleRecordAuditLog } from "./routes/events";
+import { handleGetVapidKey, handlePushSubscribe, handlePushUnsubscribe, DBPushSubscription, sendWebPush } from "./routes/push";
 import { runSmokeTests } from "./utils/smoke";
 import { API_ROUTES } from "../../shared/constants";
 import { D1AuditEvidenceProvider } from "./utils/audit";
@@ -15,6 +16,9 @@ export interface Env {
   ENCRYPTION_KEY_HEX: string;
   RESEND_API_KEY?: string;
   ENVIRONMENT?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 const corsHeaders = {
@@ -108,6 +112,22 @@ export default {
         return injectCors(await handleGetShoppingList(request, queryGate, userSession));
       }
 
+      if (path === API_ROUTES.SHOPPING_RESTOCK && request.method === "POST") {
+        return injectCors(await handleRestockItem(request, queryGate, userSession, auditProvider));
+      }
+
+      if (path === API_ROUTES.PUSH_VAPID_KEY) {
+        return injectCors(await handleGetVapidKey(request, env));
+      }
+
+      if (path === API_ROUTES.PUSH_SUBSCRIBE) {
+        if (request.method === "POST") {
+          return injectCors(await handlePushSubscribe(request, queryGate, userSession));
+        } else if (request.method === "DELETE") {
+          return injectCors(await handlePushUnsubscribe(request, queryGate, userSession));
+        }
+      }
+
       if (path === API_ROUTES.PRICES) {
         if (request.method === "POST") {
           return injectCors(await handleRecordPrice(request, queryGate, userSession, auditProvider));
@@ -157,7 +177,72 @@ export default {
       );
     }
   },
+
+  // ── Scheduled Trigger: Daily Low-Stock Push Notifications ─────────────────
+  // cron: "0 11 * * *" (11:00 UTC = 08:00 UYU) — configured in wrangler.toml
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY) {
+      console.log("[PUSH-CRON] VAPID keys not configured, skipping push notifications.");
+      return;
+    }
+
+    const queryGate = new D1QueryGate(env.DB);
+    const subject = env.VAPID_SUBJECT ?? "mailto:admin@biteradigital.com";
+
+    try {
+      // Find all products at or below min_stock across all hogares
+      const lowStockItems = await env.DB
+        .prepare(`SELECT DISTINCT i.hogar_id, i.product_name, i.quantity, i.min_stock
+                  FROM inventario i
+                  WHERE i.quantity <= i.min_stock
+                  LIMIT 100`)
+        .all();
+
+      if (!lowStockItems.results || lowStockItems.results.length === 0) {
+        console.log("[PUSH-CRON] No low-stock items found, no notifications sent.");
+        return;
+      }
+
+      // Group by hogar
+      const byHogar = new Map<string, string[]>();
+      for (const row of lowStockItems.results as any[]) {
+        const list = byHogar.get(row.hogar_id) ?? [];
+        list.push(`${row.product_name} (${row.quantity}/${row.min_stock})`);
+        byHogar.set(row.hogar_id, list);
+      }
+
+      // Send push notification to each hogar's subscribers
+      for (const [hogarId, products] of byHogar.entries()) {
+        const subs = await env.DB
+          .prepare("SELECT * FROM push_subscriptions WHERE hogar_id = ?")
+          .bind(hogarId)
+          .all<DBPushSubscription>();
+
+        if (!subs.results || subs.results.length === 0) continue;
+
+        const payload = {
+          title: "🛒 Mi Despensa — Stock Bajo",
+          body: `Necesitas reponer: ${products.slice(0, 3).join(", ")}${products.length > 3 ? ` y ${products.length - 3} más` : ""}`,
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-96.png",
+          tag: "low-stock",
+          data: { hogarId, url: "/" },
+        };
+
+        for (const sub of subs.results) {
+          ctx.waitUntil(
+            sendWebPush(sub, payload, env.VAPID_PRIVATE_KEY!, env.VAPID_PUBLIC_KEY!, subject)
+              .then(r => console.log(`[PUSH-CRON] Sent to ${sub.user_id}: ok=${r.ok} status=${r.status}`))
+              .catch(e => console.error("[PUSH-CRON] Error:", e))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[PUSH-CRON] Scheduled trigger error:", err);
+    }
+  },
 };
+
 
 function injectCors(response: Response): Response {
   const newHeaders = new Headers(response.headers);

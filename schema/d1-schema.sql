@@ -59,3 +59,16 @@ CREATE TABLE consumed_tokens (
   token_hash TEXT PRIMARY KEY,
   consumed_at TEXT NOT NULL
 );
+
+CREATE TABLE push_subscriptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  hogar_id TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(user_id, endpoint)
+);
+
+CREATE INDEX idx_push_subscriptions_hogar ON push_subscriptions(hogar_id);

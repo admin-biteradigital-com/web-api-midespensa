@@ -1,8 +1,8 @@
 // ============================================================================
-// Mi Despensa PWA — Barcode Scanner Module
-// Uses native BarcodeDetector API (Chrome 83+, Android). Graceful fallback for
-// browsers that don't support it. Zero external dependencies.
-// Sprint 3 Epic 1 — Bitera Digital SAS
+// Mi Despensa PWA — Barcode Scanner Module (Sprint 5 Update)
+// Supports camera device enumeration (webcam + environment camera selection).
+// Uses native BarcodeDetector API. Zero external dependencies.
+// Sprint 3 Epic 1 + Sprint 5 fix — Bitera Digital SAS
 // ============================================================================
 
 (function() {
@@ -18,72 +18,165 @@
   const btnCloseEl      = document.getElementById('btn-close-scanner');
   const btnScanEl       = document.getElementById('btn-scan-barcode');
   const instructionsEl  = document.getElementById('scanner-instructions');
+  const cameraSelectEl  = document.getElementById('scanner-camera-select');
+  const btnSwitchCamEl  = document.getElementById('btn-switch-camera');
 
   // Target product name input in the main form
   const productNameInput = document.getElementById('new-product-name');
 
-  let detector = null;
-  let stream   = null;
-  let rafId    = null;
-  let paused   = false;
+  let detector     = null;
+  let stream       = null;
+  let rafId        = null;
+  let paused       = false;
+  let cameraDevices = [];   // all videoinput devices
+  let activeDeviceId = '';  // currently streaming deviceId
 
-  // --- Check for BarcodeDetector API support ---
+  // ── BarcodeDetector support check ────────────────────────────────────────
   function isSupported() {
     return typeof window.BarcodeDetector !== 'undefined';
   }
 
-  // --- Open scanner modal ---
+  // ── Enumerate available camera devices ───────────────────────────────────
+  async function enumerateCameras() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      cameraDevices = devices.filter(d => d.kind === 'videoinput');
+    } catch (e) {
+      cameraDevices = [];
+    }
+
+    if (!cameraSelectEl) return;
+
+    cameraSelectEl.innerHTML = '';
+    if (cameraDevices.length === 0) {
+      const opt = document.createElement('option');
+      opt.textContent = 'No se encontraron cámaras';
+      cameraSelectEl.appendChild(opt);
+      return;
+    }
+
+    cameraDevices.forEach((device, i) => {
+      const opt = document.createElement('option');
+      opt.value = device.deviceId;
+      // Human-friendly label: prefer given label, else generic name
+      const label = device.label || `Cámara ${i + 1}`;
+      // Annotate environment vs. user facing
+      const hint = label.toLowerCase().includes('back') || label.toLowerCase().includes('environment') || label.toLowerCase().includes('rear')
+        ? ' (Trasera)' : (label.toLowerCase().includes('front') || label.toLowerCase().includes('user') ? ' (Frontal)' : '');
+      opt.textContent = label + hint;
+      if (device.deviceId === activeDeviceId) opt.selected = true;
+      cameraSelectEl.appendChild(opt);
+    });
+  }
+
+  // ── Start streaming a specific device ────────────────────────────────────
+  async function startCamera(deviceId) {
+    // Stop existing stream
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    paused = true;
+    if (rafId) cancelAnimationFrame(rafId);
+
+    const constraints = deviceId
+      ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+      : { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } };
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
+      // If exact deviceId fails (e.g. webcam constraints), try without constraints
+      if (deviceId) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId } });
+        } catch (err2) {
+          showStatus('No se pudo acceder a esta cámara: ' + err2.message, true);
+          return;
+        }
+      } else {
+        if (err.name === 'NotAllowedError') {
+          showStatus('Acceso a la cámara denegado. Habilitá el permiso en el navegador.', true);
+        } else {
+          showStatus('No se pudo acceder a la cámara: ' + err.message, true);
+        }
+        return;
+      }
+    }
+
+    // Capture active device ID from track
+    const videoTrack = stream.getVideoTracks()[0];
+    const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
+    activeDeviceId = settings.deviceId || deviceId || '';
+
+    // Update selector to match active device
+    if (cameraSelectEl) cameraSelectEl.value = activeDeviceId;
+
+    videoEl.srcObject = stream;
+    try { await videoEl.play(); } catch (e) { /* may throw if already playing */ }
+
+    resetResultArea();
+    showStatus('Apunta la cámara al código de barras...');
+    paused = false;
+    scanLoop();
+  }
+
+  // ── Open scanner modal ────────────────────────────────────────────────────
   async function openScanner() {
     if (!isSupported()) {
       showUnsupportedFallback();
       return;
     }
 
-    // Build detector for most common barcode formats
+    // Build BarcodeDetector for most common formats
     try {
       detector = new window.BarcodeDetector({
-        formats: [
-          'ean_13', 'ean_8', 'upc_a', 'upc_e',
-          'code_128', 'code_39', 'code_93',
-          'qr_code', 'data_matrix'
-        ]
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'qr_code', 'data_matrix']
       });
     } catch (e) {
-      // Detector may throw if formats not supported; try without format restriction
+      try { detector = new window.BarcodeDetector(); }
+      catch (e2) { showUnsupportedFallback(); return; }
+    }
+
+    modalEl.classList.remove('hidden');
+
+    // First: request permission so enumerateDevices returns labels
+    try {
+      // Prefer environment camera on first open; falls back to any
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+    } catch (err) {
+      // Try without facing mode (for desktop webcams)
       try {
-        detector = new window.BarcodeDetector();
-      } catch (e2) {
-        showUnsupportedFallback();
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (err2) {
+        if (err2.name === 'NotAllowedError') {
+          showStatus('Acceso a la cámara denegado. Habilitá el permiso en el navegador.', true);
+        } else {
+          showStatus('No se pudo acceder a la cámara: ' + err2.message, true);
+        }
         return;
       }
     }
 
-    // Request camera access
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-    } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        showStatus('Acceso a la cámara denegado. Por favor habilitá el permiso en el navegador.', true);
-      } else {
-        showStatus('No se pudo acceder a la cámara: ' + err.message, true);
-      }
-      modalEl.classList.remove('hidden');
-      return;
-    }
+    // Set active device before enumerate so we can mark it in the list
+    const vt = stream.getVideoTracks()[0];
+    const vtSettings = vt && vt.getSettings ? vt.getSettings() : {};
+    activeDeviceId = vtSettings.deviceId || '';
+
+    // Enumerate cameras (labels available after permission granted)
+    await enumerateCameras();
 
     videoEl.srcObject = stream;
-    await videoEl.play();
+    try { await videoEl.play(); } catch (e) {}
 
     resetResultArea();
-    modalEl.classList.remove('hidden');
-    showStatus('Apunta la cámara al código de barras...');
     paused = false;
     scanLoop();
   }
 
-  // --- Scan loop via requestAnimationFrame ---
+  // ── Scan loop via requestAnimationFrame ───────────────────────────────────
   async function scanLoop() {
     if (paused || !videoEl.srcObject) return;
 
@@ -92,33 +185,29 @@
         const barcodes = await detector.detect(videoEl);
         if (barcodes && barcodes.length > 0) {
           onBarcodeDetected(barcodes[0].rawValue);
-          return; // Pause loop after first detection
+          return; // Pause loop on detection
         }
-      } catch (e) {
-        // Silently skip detection errors mid-stream
-      }
+      } catch (e) { /* silently skip detection errors */ }
     }
 
     rafId = requestAnimationFrame(scanLoop);
   }
 
-  // --- Handle detected barcode ---
+  // ── Handle detected barcode ───────────────────────────────────────────────
   function onBarcodeDetected(rawValue) {
     paused = true;
     if (rafId) cancelAnimationFrame(rafId);
-
-    // Haptic feedback (mobile)
     if (navigator.vibrate) navigator.vibrate(100);
 
     detectedCodeEl.textContent = rawValue;
-    nameInputEl.value = ''; // Clear for user input
+    nameInputEl.value = '';
     resultAreaEl.style.display = 'flex';
-    instructionsEl.style.display = 'none';
+    if (instructionsEl) instructionsEl.style.display = 'none';
     showStatus('✅ ¡Código detectado! Confirma o escribe el nombre del producto.');
     nameInputEl.focus();
   }
 
-  // --- Confirm and transfer name to product form ---
+  // ── Confirm and transfer name to product form ─────────────────────────────
   function confirmName() {
     const name = nameInputEl.value.trim();
     if (!name) {
@@ -126,12 +215,12 @@
       nameInputEl.placeholder = 'Escribe el nombre del producto';
       return;
     }
-    productNameInput.value = name;
+    if (productNameInput) productNameInput.value = name;
     closeScanner();
-    productNameInput.focus();
+    if (productNameInput) productNameInput.focus();
   }
 
-  // --- Close scanner and stop camera stream ---
+  // ── Close scanner and stop camera stream ──────────────────────────────────
   function closeScanner() {
     paused = true;
     if (rafId) cancelAnimationFrame(rafId);
@@ -140,11 +229,12 @@
       stream = null;
     }
     videoEl.srcObject = null;
+    activeDeviceId = '';
     modalEl.classList.add('hidden');
     resetResultArea();
   }
 
-  // --- Reset result panel ---
+  // ── Reset result panel ────────────────────────────────────────────────────
   function resetResultArea() {
     resultAreaEl.style.display = 'none';
     detectedCodeEl.textContent = '';
@@ -154,44 +244,56 @@
     showStatus('Apunta la cámara al código de barras...');
   }
 
-  // --- Show status text ---
+  // ── Show status text ──────────────────────────────────────────────────────
   function showStatus(msg, isError = false) {
     if (!statusEl) return;
     statusEl.textContent = msg;
     statusEl.style.color = isError ? 'var(--accent-red)' : 'var(--text-muted)';
   }
 
-  // --- Fallback for unsupported browsers ---
+  // ── Fallback for unsupported browsers ─────────────────────────────────────
   function showUnsupportedFallback() {
     modalEl.classList.remove('hidden');
-    showStatus('Tu navegador no soporta el escáner de códigos de barras. Usa Chrome en Android o escribe el nombre manualmente.', true);
-    resultAreaEl.style.display = 'none';
+    showStatus('Tu navegador no soporta el escáner automático. Escribe el nombre del producto manualmente, o usa Chrome/Edge en Android.', true);
+    if (resultAreaEl) resultAreaEl.style.display = 'none';
+    // Show manual name entry directly
+    if (nameInputEl) {
+      nameInputEl.style.display = 'block';
+      nameInputEl.placeholder = 'Escribe el nombre del producto';
+    }
+    if (btnUseNameEl) btnUseNameEl.style.display = 'block';
   }
 
-  // --- Resume scan after result dismissed ---
+  // ── Resume scan after result dismissed ────────────────────────────────────
   function resumeScan() {
     resetResultArea();
     paused = false;
     scanLoop();
   }
 
-  // --- Wire up events (deferred to DOMContentLoaded) ---
+  // ── Wire up events (deferred to DOMContentLoaded) ─────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
-    if (btnScanEl) {
-      btnScanEl.addEventListener('click', openScanner);
-    }
-    if (btnCloseEl) {
-      btnCloseEl.addEventListener('click', closeScanner);
-    }
-    if (btnUseNameEl) {
-      btnUseNameEl.addEventListener('click', confirmName);
-    }
+    if (btnScanEl)      btnScanEl.addEventListener('click', openScanner);
+    if (btnCloseEl)     btnCloseEl.addEventListener('click', closeScanner);
+    if (btnUseNameEl)   btnUseNameEl.addEventListener('click', confirmName);
+
     if (nameInputEl) {
       nameInputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') confirmName();
         if (e.key === 'Escape') resumeScan();
       });
     }
+
+    // Camera switch button
+    if (btnSwitchCamEl) {
+      btnSwitchCamEl.addEventListener('click', () => {
+        const selectedId = cameraSelectEl ? cameraSelectEl.value : '';
+        if (selectedId && selectedId !== activeDeviceId) {
+          startCamera(selectedId);
+        }
+      });
+    }
+
     // Close on backdrop click
     if (modalEl) {
       modalEl.addEventListener('click', (e) => {
