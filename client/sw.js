@@ -1,4 +1,4 @@
-const CACHE_NAME = "mi-despensa-cache-v3";
+const CACHE_NAME = "mi-despensa-cache-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const ASSETS = [
   "./indexeddb.js",
   "./sync.js",
   "./barcode.js",
+  "./analytics.js",
   "./core/event-bus.js",
   "./session/session-manager.js",
   "./auth-state.js"

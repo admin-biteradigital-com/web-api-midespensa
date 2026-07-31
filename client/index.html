@@ -131,18 +131,29 @@
       </div>
 
       <!-- Tarjetas de Métricas Resumen UI/UX -->
-      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
         <div class="glass-card" style="flex: 1; padding: 14px 16px; gap: 4px;">
-          <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Ítems</span>
+          <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Ítems</span>
           <span id="metric-total-items" style="font-size: 22px; font-weight: 700; color: #fff;">0</span>
         </div>
         <div class="glass-card" style="flex: 1; padding: 14px 16px; gap: 4px; border-color: rgba(239, 68, 68, 0.2);">
-          <span style="font-size: 11px; color: var(--accent-orange); text-transform: uppercase; font-weight: 600;">⚠️ Por Recomprar</span>
+          <span style="font-size: 10px; color: var(--accent-orange); text-transform: uppercase; font-weight: 600;">&#9888;&#65039; Recomprar</span>
           <span id="metric-low-items" style="font-size: 22px; font-weight: 700; color: var(--accent-red);">0</span>
+        </div>
+        <div class="glass-card" style="flex: 1; padding: 14px 16px; gap: 4px; border-color: rgba(16, 185, 129, 0.15);">
+          <span style="font-size: 10px; color: var(--accent-green); text-transform: uppercase; font-weight: 600;">Valor Stock</span>
+          <span id="metric-stock-value" style="font-size: 16px; font-weight: 700; color: var(--accent-green);">$0</span>
         </div>
       </div>
 
-      <!-- Agregar nuevo producto -->
+      <!-- Navigation Tabs: Inventario / Reportes -->
+      <div id="main-nav-tabs" style="display: flex; gap: 0; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 10px; padding: 3px; margin-bottom: 16px;">
+        <button id="tab-nav-inventario" class="nav-tab active" style="flex: 1; padding: 8px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: var(--primary); color: #fff;">&#128722; Inventario</button>
+        <button id="tab-nav-reportes" class="nav-tab" style="flex: 1; padding: 8px 12px; font-size: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: transparent; color: var(--text-muted);">&#128202; Reportes</button>
+      </div>
+
+      <!-- PANEL: Inventario (default visible) -->
+      <div id="panel-inventario">
       <div class="glass-card">
         <h3 class="section-title" style="font-size: 15px;">Añadir Producto</h3>
         <div class="form-group" style="gap: 10px;">
@@ -237,6 +248,42 @@
 
       <!-- Acciones globales -->
       <button id="btn-logout" class="btn-secondary" style="margin-top: 10px;">Cerrar Sesión</button>
+      </div><!-- END panel-inventario -->
+
+      <!-- PANEL: Reportes de Consumo y Gasto -->
+      <div id="panel-reportes" style="display: none; flex-direction: column; gap: 18px;">
+
+        <!-- Gráfico de Gasto Estimado por Categoría -->
+        <div class="glass-card" style="padding: 18px; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 class="section-title" style="font-size: 14px; margin: 0;">&#128202; Gasto por Categoría</h3>
+            <span id="report-currency-label" style="font-size: 10px; color: var(--text-muted);">en UYU</span>
+          </div>
+          <canvas id="chart-category-spend" height="180" style="width: 100%; display: block;"></canvas>
+          <div id="chart-legend" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;"></div>
+        </div>
+
+        <!-- Top Productos por Cantidad en Stock -->
+        <div class="glass-card" style="padding: 18px; gap: 12px;">
+          <h3 class="section-title" style="font-size: 14px; margin: 0;">&#127942; Top Productos en Stock</h3>
+          <div id="report-top-products" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <!-- Resumen por Categoría -->
+        <div class="glass-card" style="padding: 18px; gap: 12px;">
+          <h3 class="section-title" style="font-size: 14px; margin: 0;">&#128230; Resumen por Categoría</h3>
+          <div id="report-category-summary" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <!-- Exportar a CSV -->
+        <div class="glass-card" style="padding: 16px; gap: 10px;">
+          <h3 class="section-title" style="font-size: 14px; margin: 0;">&#128196; Exportar Datos</h3>
+          <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">Descarga el estado actual de tu inventario en formato CSV para planillas de cálculo.</p>
+          <button id="btn-export-csv" style="padding: 10px; font-size: 13px;">&#8595; Descargar Inventario CSV</button>
+        </div>
+
+        <button id="btn-logout-reportes" class="btn-secondary" style="margin-top: 4px;">Cerrar Sesión</button>
+      </div><!-- END panel-reportes -->
     </main>
 
     <!-- Footer Corporativo -->
@@ -305,6 +352,7 @@
   <script src="session/session-manager.js"></script>
   <script src="auth-state.js"></script>
   <script src="barcode.js"></script>
+  <script src="analytics.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

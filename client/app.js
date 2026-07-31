@@ -63,6 +63,13 @@ const ui = {
   btnCreateProduct:     document.getElementById("btn-add-product"),
   btnRefreshManual:     document.getElementById("btn-refresh-manual"),
   btnLogout:            document.getElementById("btn-logout"),
+  btnLogoutReportes:    document.getElementById("btn-logout-reportes"),
+  btnExportCsv:         document.getElementById("btn-export-csv"),
+  tabNavInventario:     document.getElementById("tab-nav-inventario"),
+  tabNavReportes:       document.getElementById("tab-nav-reportes"),
+  panelInventario:      document.getElementById("panel-inventario"),
+  panelReportes:        document.getElementById("panel-reportes"),
+  metricStockValue:     document.getElementById("metric-stock-value"),
 };
 
 // --- View Map (viewId string → DOM element) ---
@@ -396,10 +403,12 @@ async function loadEventLogs() {
 let activeTab = "ALL"; // "ALL" | "LOW"
 let searchQuery = "";
 let selectedCategory = "ALL";
+let allInventoryItems = []; // cached for analytics tab
 
 // Render dynamic stock cards
 function renderInventoryList(items) {
   ui.inventoryContainer.innerHTML = "";
+  allInventoryItems = items; // keep a reference for the reports panel
 
   // Actualizar métricas resumen UI/UX
   if (ui.metricTotalItems && ui.metricLowItems) {
@@ -407,6 +416,12 @@ function renderInventoryList(items) {
     const lowCount = items.filter(i => i.quantity <= (i.min_stock !== undefined ? i.min_stock : 1)).length;
     ui.metricTotalItems.textContent = totalCount;
     ui.metricLowItems.textContent = lowCount;
+  }
+
+  // Actualizar métrica de Valor en Stock (suma quantity, sin precio exacto si no hay historial)
+  if (ui.metricStockValue) {
+    const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+    ui.metricStockValue.textContent = totalQty + ' u.';
   }
 
   const filteredItems = items.filter(item => {
@@ -620,6 +635,52 @@ if (ui.btnClosePriceModal && ui.modalPriceHistory) {
   ui.btnClosePriceModal.addEventListener("click", () => {
     ui.modalPriceHistory.classList.add("hidden");
   });
+}
+
+// ── Navigation: Inventario / Reportes ────────────────────────────────────────
+let cachedPriceHistory = [];
+
+function showInventarioPanel() {
+  if (ui.panelInventario) ui.panelInventario.style.display = "";
+  if (ui.panelReportes)   ui.panelReportes.style.display   = "none";
+  if (ui.tabNavInventario) {
+    ui.tabNavInventario.style.background = "var(--primary)";
+    ui.tabNavInventario.style.color      = "#fff";
+  }
+  if (ui.tabNavReportes) {
+    ui.tabNavReportes.style.background = "transparent";
+    ui.tabNavReportes.style.color      = "var(--text-muted)";
+  }
+}
+
+async function showReportesPanel() {
+  if (ui.panelInventario) ui.panelInventario.style.display = "none";
+  if (ui.panelReportes)   ui.panelReportes.style.display   = "flex";
+  if (ui.tabNavReportes) {
+    ui.tabNavReportes.style.background = "var(--primary)";
+    ui.tabNavReportes.style.color      = "#fff";
+  }
+  if (ui.tabNavInventario) {
+    ui.tabNavInventario.style.background = "transparent";
+    ui.tabNavInventario.style.color      = "var(--text-muted)";
+  }
+  if (typeof window.renderReports === "function") {
+    await window.renderReports(allInventoryItems, cachedPriceHistory);
+  }
+}
+
+if (ui.tabNavInventario) ui.tabNavInventario.addEventListener("click", showInventarioPanel);
+if (ui.tabNavReportes)   ui.tabNavReportes.addEventListener("click", showReportesPanel);
+
+if (ui.btnExportCsv) {
+  ui.btnExportCsv.addEventListener("click", async () => {
+    const items = await getInventoryLocal();
+    if (typeof window.exportInventoryCSV === "function") window.exportInventoryCSV(items);
+  });
+}
+
+if (ui.btnLogoutReportes) {
+  ui.btnLogoutReportes.addEventListener("click", () => { if (ui.btnLogout) ui.btnLogout.click(); });
 }
 
 async function openPriceHistoryModal(productName) {
