@@ -130,6 +130,18 @@
         <button id="btn-show-invite-code" class="btn-secondary" style="font-size: 11px; padding: 6px 10px; box-shadow: none;">🔑 Código de Invitación</button>
       </div>
 
+      <!-- Tarjetas de Métricas Resumen UI/UX -->
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <div class="glass-card" style="flex: 1; padding: 14px 16px; gap: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Ítems</span>
+          <span id="metric-total-items" style="font-size: 22px; font-weight: 700; color: #fff;">0</span>
+        </div>
+        <div class="glass-card" style="flex: 1; padding: 14px 16px; gap: 4px; border-color: rgba(239, 68, 68, 0.2);">
+          <span style="font-size: 11px; color: var(--accent-orange); text-transform: uppercase; font-weight: 600;">⚠️ Por Recomprar</span>
+          <span id="metric-low-items" style="font-size: 22px; font-weight: 700; color: var(--accent-red);">0</span>
+        </div>
+      </div>
+
       <!-- Agregar nuevo producto -->
       <div class="glass-card">
         <h3 class="section-title" style="font-size: 15px;">Añadir Producto</h3>

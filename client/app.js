@@ -49,6 +49,8 @@ const ui = {
   btnClosePriceModal:   document.getElementById("btn-close-price-modal"),
   dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
   dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
+  metricTotalItems:     document.getElementById("metric-total-items"),
+  metricLowItems:       document.getElementById("metric-low-items"),
   inventoryContainer:   document.getElementById("inventory-list-container"),
   eventLogList:         document.getElementById("event-log-list"),
   toast:                document.getElementById("toast"),
@@ -394,6 +396,14 @@ let searchQuery = "";
 // Render dynamic stock cards
 function renderInventoryList(items) {
   ui.inventoryContainer.innerHTML = "";
+
+  // Actualizar métricas resumen UI/UX
+  if (ui.metricTotalItems && ui.metricLowItems) {
+    const totalCount = items.length;
+    const lowCount = items.filter(i => i.quantity <= (i.min_stock !== undefined ? i.min_stock : 1)).length;
+    ui.metricTotalItems.textContent = totalCount;
+    ui.metricLowItems.textContent = lowCount;
+  }
 
   const filteredItems = items.filter(item => {
     const matchesTab = activeTab === "LOW"
