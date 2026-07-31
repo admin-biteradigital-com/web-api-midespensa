@@ -36,8 +36,10 @@ SessionModule.initialize(EventBus, DOMAIN_EVENTS);
 // Helper to create a fake JWT token with a given payload for testing.
 // This does NOT sign the token; it only creates a decodable Base64 payload.
 function createTestJWT(payload: Record<string, any>): string {
-  const header = Buffer.from(JSON.stringify({ alg: "HS256" })).toString("base64url");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const base64Url = (str: string) =>
+    btoa(str).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const header = base64Url(JSON.stringify({ alg: "HS256" }));
+  const body = base64Url(JSON.stringify(payload));
   const signature = "test-signature";
   return `${header}.${body}.${signature}`;
 }
