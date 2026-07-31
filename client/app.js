@@ -33,6 +33,8 @@ const ui = {
   inputEmail:           document.getElementById("login-email"),
   inputHogarName:       document.getElementById("hogar-name"),
   inputProductName:     document.getElementById("new-product-name"),
+  inputProductQty:      document.getElementById("new-product-qty"),
+  inputProductMin:      document.getElementById("new-product-min"),
   dashboardHogarName:   document.getElementById("dashboard-hogar-name"),
   dashboardUserIdentity:document.getElementById("dashboard-user-identity"),
   inventoryContainer:   document.getElementById("inventory-list-container"),
@@ -351,6 +353,14 @@ function renderInventoryList(items) {
     name.className = "product-name";
     name.textContent = item.product_name;
 
+    const minStock = item.min_stock !== undefined ? item.min_stock : 1;
+    if (item.quantity <= minStock) {
+      const lowBadge = document.createElement("span");
+      lowBadge.className = "stock-badge-low";
+      lowBadge.textContent = "⚠️ Recomprar";
+      name.appendChild(lowBadge);
+    }
+
     const updated = document.createElement("span");
     updated.className = "product-updated";
     updated.textContent = `Actualizado: ${new Date(item.updated_at).toLocaleTimeString()}`;
@@ -407,9 +417,11 @@ async function handleUpdateQuantity(productName, eventType, delta) {
 
 ui.btnCreateProduct.addEventListener("click", () => {
   const name = ui.inputProductName.value.trim();
+  const qty = parseInt(ui.inputProductQty ? ui.inputProductQty.value : "1", 10) || 1;
   if (!name) { showToast("Ingresa el nombre del producto"); return; }
-  handleUpdateQuantity(name, "ADD", 1);
+  handleUpdateQuantity(name, "ADD", qty);
   ui.inputProductName.value = "";
+  if (ui.inputProductQty) ui.inputProductQty.value = "1";
 });
 
 // ============================================================================

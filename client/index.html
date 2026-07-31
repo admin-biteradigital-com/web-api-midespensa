@@ -120,9 +120,21 @@
       <!-- Agregar nuevo producto -->
       <div class="glass-card">
         <h3 class="section-title" style="font-size: 15px;">Añadir Producto</h3>
-        <div class="form-group" style="flex-direction: row; gap: 10px;">
-          <input type="text" id="new-product-name" placeholder="Leche, Arroz, Café..." style="flex: 1; padding: 10px 12px;">
-          <button id="btn-add-product" style="padding: 10px 16px; box-shadow: none;">+</button>
+        <div class="form-group" style="gap: 10px;">
+          <input type="text" id="new-product-name" placeholder="Ej. Leche, Arroz, Café..." style="padding: 10px 12px;">
+          <div style="display: flex; gap: 8px;">
+            <div style="flex: 1;">
+              <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Cantidad Inicial</label>
+              <input type="number" id="new-product-qty" min="1" value="1" style="width: 100%; padding: 8px 10px;">
+            </div>
+            <div style="flex: 1;">
+              <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Mínimo Alerta</label>
+              <input type="number" id="new-product-min" min="1" value="1" style="width: 100%; padding: 8px 10px;">
+            </div>
+            <div style="display: flex; align-items: flex-end;">
+              <button id="btn-add-product" style="padding: 9px 18px; box-shadow: none; height: 38px;">+ Agregar</button>
+            </div>
+          </div>
         </div>
       </div>
 
