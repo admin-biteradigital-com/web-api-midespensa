@@ -379,9 +379,11 @@ async function loadEventLogs() {
       data.events.forEach(evt => {
         const row = document.createElement("div");
         row.className = `event-row ${evt.event_type.toLowerCase()}`;
+        const displayName = evt.product_name || `Producto (${evt.product_id.substring(0, 6)})`;
+        const eventDate = new Date(evt.timestamp);
         row.innerHTML = `
-          <span><strong>${evt.event_type === "ADD" ? "ALTA" : "BAJA"}</strong> ${evt.quantity_delta > 0 ? "+" + evt.quantity_delta : evt.quantity_delta} - Prod ID: ${evt.product_id.substring(0, 8)}...</span>
-          <span class="event-time">${new Date(evt.timestamp).toLocaleTimeString()}</span>
+          <span><strong>${evt.event_type === "ADD" ? "ALTA" : "BAJA"}</strong> ${evt.quantity_delta > 0 ? "+" + evt.quantity_delta : evt.quantity_delta} - ${displayName}</span>
+          <span class="event-time">${eventDate.toLocaleDateString()} ${eventDate.toLocaleTimeString()}</span>
         `;
         ui.eventLogList.appendChild(row);
       });

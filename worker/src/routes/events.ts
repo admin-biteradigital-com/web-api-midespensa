@@ -25,9 +25,9 @@ export async function handleGetEventsStock(
 
   try {
     const tenantCtx = new TenantContext(hogarId);
-    const events = await queryGate.executeTenantQuery<DBEventStock>(
+    const events = await queryGate.executeTenantQuery<DBEventStock & { product_name?: string }>(
       tenantCtx,
-      "SELECT id, hogar_id, product_id, event_type, quantity_delta, timestamp, actor_user_id FROM events_stock WHERE hogar_id = ? ORDER BY timestamp DESC",
+      "SELECT e.id, e.hogar_id, e.product_id, e.event_type, e.quantity_delta, e.timestamp, e.actor_user_id, COALESCE(i.product_name, e.product_id) AS product_name FROM events_stock e LEFT JOIN inventario i ON e.product_id = i.id WHERE e.hogar_id = ? ORDER BY e.timestamp DESC LIMIT 20",
       [hogarId]
     );
 
